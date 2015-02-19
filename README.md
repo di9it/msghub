@@ -23,6 +23,7 @@ I. Create hub, subscribe on "any topic" and publish "new message" into "any topi
 	{
 	   // handle message
 	}
+
 	int main()
 	{
 		boost::asio::io_service io_service;
@@ -33,6 +34,7 @@ I. Create hub, subscribe on "any topic" and publish "new message" into "any topi
 		msghub.subscribe("any topic", on_message);
 		// Current or any another client
 		msghub.publish("any topic", "new message");
+		io_service.run();
 	}
 ```
 II. Connect to hub on "localhost" and publish "new message" into "any topic":
@@ -43,5 +45,6 @@ II. Connect to hub on "localhost" and publish "new message" into "any topic":
 		msghub msghub(io_service);
 		msghub.connect("localhost", 0xbee);
 		msghub.publish("any topic", "new message");
+		io_service.run();
 	}
 ```
