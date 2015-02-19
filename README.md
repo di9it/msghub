@@ -1,13 +1,15 @@
 MSGHUB
 ======
-
 This is a lightweight asynchronous message bus C++ library based on [Boost.Asio](http://www.boost.org/doc/libs/1_56_0/doc/html/boost_asio.html).
+
 It allows to connect, send and receive custom messages.
 
-The idea is that there are topics, subscribers and publishers.
-One client creates a hub instance all others are connecting to it.
+The idea is simple... there are topics, subscribers and publishers.
+
+One client create a **msghub** instance and others are connecting to it.
 
 Subscriber specify the topic name of its interest.
+
 All clients publish message into a topic and hub distribute messages across all subscribers.
 
 Message is a byte array or a string.
