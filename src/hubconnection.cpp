@@ -64,6 +64,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 		{
 			io_service_.post(boost::bind(&hubconnection::do_write, shared_from_this(), msg));
 		}
+        return true;
 	}
 	catch (std::exception&)
 	{
