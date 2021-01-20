@@ -30,7 +30,8 @@ char* hubmessage::data()
 
 size_t hubmessage::header_length() const
 {
-	return offsetof(packet, payload);
+    static_assert(0 == offsetof(packet, headers));
+    return offsetof(packet::headers_t, payload);
 }
 
 size_t hubmessage::length() const
@@ -40,7 +41,7 @@ size_t hubmessage::length() const
 
 char* hubmessage::payload()
 {
-	return data_.payload;
+	return headers().payload;
 }
 
 char* hubmessage::topic()
@@ -50,17 +51,27 @@ char* hubmessage::topic()
 
 //char* hubmessage::payload() const
 //{
-//	return data_.payload;
+//	return headers().payload;
 //}
 
 size_t hubmessage::payload_length() const
 {
-	return data_.topiclen + data_.bodylen;
+	return headers().topiclen + headers().bodylen;
 }
 
 size_t hubmessage::topic_length() const
 {
-	return data_.topiclen;
+	return headers().topiclen;
+}
+
+hubmessage::packet::headers_t& hubmessage::headers()
+{
+	return data_.headers;
+}
+
+hubmessage::packet::headers_t const& hubmessage::headers() const
+{
+	return data_.headers;
 }
 
 char* hubmessage::body()
@@ -70,42 +81,42 @@ char* hubmessage::body()
 
 hubmessage::action hubmessage::get_action() const
 {
-	return data_.msgaction;
+	return headers().msgaction;
 }
 
 void hubmessage::set_action(action action)
 {
-	data_.msgaction = action;
+	headers().msgaction = action;
 }
 
 void hubmessage::set_message(const std::string& subj)
 {
 	memcpy(payload(), subj.c_str(), subj.length());
-	data_.topiclen = subj.length();
-	data_.bodylen = 0;
-	data_.magic = cookie;
+	headers().topiclen = subj.length();
+	headers().bodylen = 0;
+	headers().magic = cookie;
 }
 
 void hubmessage::set_message(const std::string& subj, const std::vector<char>& msg)
 {
 	set_message(subj);
-	data_.bodylen = msg.size();
+	headers().bodylen = msg.size();
 	if (header_length() + msg.size() > messagesize)
 	{
 		throw std::out_of_range("Povided message is too big");
 	}
 
-	memcpy(payload() + data_.topiclen, msg.data(), msg.size());
+	memcpy(payload() + headers().topiclen, msg.data(), msg.size());
 }
 
 size_t hubmessage::body_length() const
 {
-	return data_.bodylen;
+	return headers().bodylen;
 }
 
 bool hubmessage::verify() const
 {
-	if (data_.magic != cookie)
+	if (headers().magic != cookie)
 		return false;
 
 	return true;
