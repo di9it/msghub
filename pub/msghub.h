@@ -12,7 +12,7 @@ class msghub_impl;
 class msghub
 {
 public:
-    typedef std::function< void(const std::string& topic, std::vector<char>& message) > onmessage;
+    typedef std::function< void(const std::string& topic, std::vector<char> const& message) > onmessage;
     
 public:
     msghub( boost::asio::io_service& s );

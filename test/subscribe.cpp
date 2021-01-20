@@ -13,12 +13,13 @@ std::condition_variable newmessage;
 bool goodmessage = false;
 
 using namespace boost::unit_test;
-void test_create_on_message(const std::string& topic, std::vector<char>& message)
+void test_create_on_message(const std::string& topic, std::vector<char> const& message)
 {
 	std::unique_lock<std::mutex> lock(mutant);
-	std::string expected("$testmessage$");
-	goodmessage = std::equal(expected.begin(), expected.end(), message.begin());
-	BOOST_CHECK(goodmessage);
+	std::vector<char> expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'};
+    goodmessage = (expected == message);
+	BOOST_CHECK_EQUAL("test_topic", topic);
+    BOOST_TEST(expected == message, boost::test_tools::per_element());
 	newmessage.notify_one();
 }
 

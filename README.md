@@ -19,7 +19,7 @@ Examples
 I. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
 ```c++
 	// Message handler
-	void on_message(const std::string& topic, std::vector<char>& message)
+	void on_message(const std::string& topic, std::vector<char> const& message)
 	{
 	   // handle message
 	}
