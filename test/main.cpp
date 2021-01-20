@@ -15,7 +15,7 @@ void test_server_oncleintfailure();
 void test_toobigmsg();
 void test_emptymsg();
 
-test_suite* init_unit_test_suite(int argc, char* argv[])
+test_suite* init_unit_test_suite(int, char**)
 {
 	test_suite *test = BOOST_TEST_SUITE("messagehub test");
 
