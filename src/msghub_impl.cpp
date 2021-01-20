@@ -229,8 +229,8 @@ void msghub_impl::handle_accept(boost::shared_ptr<hubclient> client, const boost
 	}
 	else
 	{
-		// TODO: Handle IO error - on thread exit
-		int e = error.value();
+		//// TODO: Handle IO error - on thread exit
+		//int e = error.value();
 	}
 
 	accept_next();
