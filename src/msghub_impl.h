@@ -18,6 +18,7 @@
 #include <set>
 
 #include <boost/bind.hpp>
+#include <boost/optional.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
@@ -30,18 +31,15 @@ using boost::asio::ip::tcp;
 
 class msghub_impl : public hub
 {
-public:
-
 private:
 	typedef std::map < std::string, msghub::onmessage >::iterator messagemapit;
 	std::map < std::string, msghub::onmessage > messagemap_;
-
-public:
 
 private:
 	std::vector<boost::shared_ptr<boost::thread> > threads_;
 	boost::shared_ptr<hubconnection> publisher_;
 	boost::asio::io_service& io_service_;
+    boost::optional<boost::asio::io_service::work> work_;
 	tcp::acceptor acceptor_;
 	bool initok_;
 

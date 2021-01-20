@@ -46,12 +46,14 @@ void msghub_impl::initpool(uint8_t threads)
 msghub_impl::msghub_impl(boost::asio::io_service& io_service)
 	: publisher_(new hubconnection(io_service, *this))
 	, io_service_(io_service)
+    , work_(boost::asio::io_service::work(io_service))
 	, acceptor_(io_service)
 	, initok_(false)
 {}
 
 msghub_impl::~msghub_impl()
 {
+    work_.reset();
 	io_service_.stop();
     join();
 }
@@ -90,9 +92,12 @@ bool msghub_impl::create(uint32_t port, uint8_t threads)
 
 void msghub_impl::join()
 {
+    work_.reset();
+
 	// Join to all service threads
 	for (auto it : threads_)
-		it->join();
+        if (it->joinable())
+            it->join();
 }
 
 bool msghub_impl::publish(const std::string& topic, const std::vector<char>& message)
