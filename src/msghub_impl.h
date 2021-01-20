@@ -39,12 +39,12 @@ private:
 public:
 
 private:
-	bool		initok_;
 	std::vector<boost::shared_ptr<boost::thread> > threads_;
+	boost::shared_ptr<hubconnection> publisher_;
 	boost::asio::io_service& io_service_;
 	tcp::acceptor acceptor_;
+	bool initok_;
 
-	boost::shared_ptr<hubconnection> publisher_;
 
 	void initpool(uint8_t threads);
 

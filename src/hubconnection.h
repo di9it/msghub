@@ -40,9 +40,9 @@ private:
 	void do_close();
 
 private:
-	hub&						courier_;
 	boost::asio::io_service&	io_service_;
 	tcp::socket					socket_;
+	hub&						courier_;
 	hubmessage					inmsg_;
 	hubmessage_queue			outmsg_queue_;
 	boost::mutex				write_msgs_lock_;

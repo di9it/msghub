@@ -45,8 +45,8 @@ void msghub_impl::initpool(uint8_t threads)
 
 msghub_impl::msghub_impl(boost::asio::io_service& io_service)
 	: publisher_(new hubconnection(io_service, *this))
-	, acceptor_(io_service)
 	, io_service_(io_service)
+	, acceptor_(io_service)
 	, initok_(false)
 {}
 
