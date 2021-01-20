@@ -11,6 +11,6 @@ class hub
 {
 public:
 	virtual void distribute(boost::shared_ptr<hubclient> subscriber, hubmessage& msg) = 0;
-	virtual void deliver(boost::shared_ptr<hubconnection> publisher, hubmessage& msg) = 0;
+	virtual void deliver(hubmessage& msg) = 0;
 };
 #endif

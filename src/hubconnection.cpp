@@ -98,7 +98,7 @@ void hubconnection::handle_read_body(const boost::system::error_code& error)
 {
 	if (!error)
 	{
-		courier_.deliver(shared_from_this(), inmsg_);
+		courier_.deliver(inmsg_);
 
 		boost::asio::async_read(socket_,
 			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),

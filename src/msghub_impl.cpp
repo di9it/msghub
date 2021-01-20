@@ -200,7 +200,7 @@ void msghub_impl::distribute(boost::shared_ptr<hubclient> subscriber, hubmessage
 	}
 }
 
-void msghub_impl::deliver(boost::shared_ptr<hubconnection> publisher, hubmessage& msg)
+void msghub_impl::deliver(hubmessage& msg)
 {
 	std::string topic(msg.payload(), msg.topic_length());
 	messagemapit it = messagemap_.find(topic);

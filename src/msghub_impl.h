@@ -68,7 +68,7 @@ public:
 	boost::mutex subscriberslock_;
 
 	void distribute(boost::shared_ptr<hubclient> subscriber, hubmessage& msg);
-	void deliver(boost::shared_ptr<hubconnection> publisher, hubmessage& msg);
+	void deliver(hubmessage& msg);
 	void accept_next();
 	void handle_accept(boost::shared_ptr<hubclient> session, const boost::system::error_code& error);
 };
