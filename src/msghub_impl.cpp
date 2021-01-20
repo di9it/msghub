@@ -53,8 +53,6 @@ msghub_impl::msghub_impl(boost::asio::io_service& io_service)
 
 msghub_impl::~msghub_impl()
 {
-    work_.reset();
-	io_service_.stop();
     join();
 }
 
@@ -71,18 +69,9 @@ bool msghub_impl::create(uint32_t port, uint8_t threads)
 	tcp::endpoint endpoint(tcp::v4(), port);
 	acceptor_ = tcp::acceptor(io_service_, endpoint);
 
-	//acceptor_.open(endpoint.protocol());
-	//acceptor_.set_option(tcp::acceptor::reuse_address(false));
-	//boost::system::error_code err;
-	//err = acceptor_.bind(endpoint, err);
-	//if (err)
-	//	return false;
-	//acceptor_.listen();
+    acceptor_.set_option(tcp::acceptor::reuse_address(true));
+	acceptor_.listen();
 
-	//endpoint
-	//boost::asio::socket_base::reuse_address option(false);
-	//acceptor_.set_option(option);
-	//acceptor_.
 	accept_next();
 
 	initpool(threads);
@@ -92,6 +81,11 @@ bool msghub_impl::create(uint32_t port, uint8_t threads)
 
 void msghub_impl::join()
 {
+    if (publisher_)
+        publisher_->close(false);
+    publisher_.reset();
+    if (acceptor_.is_open()) 
+        acceptor_.cancel();
     work_.reset();
 
 	// Join to all service threads
