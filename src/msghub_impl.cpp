@@ -53,6 +53,7 @@ msghub_impl::msghub_impl(boost::asio::io_service& io_service)
 msghub_impl::~msghub_impl()
 {
 	io_service_.stop();
+    join();
 }
 
 
