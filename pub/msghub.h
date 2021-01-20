@@ -24,15 +24,6 @@ public:
     bool publish(const std::string& topic, const std::vector<char>& message);
 	bool publish(const std::string& topic, const std::string& message);
 
-	//template<typename T>
-	//publish(const std::string& topic, const T& buff)
-	//{
-	//	std::copy(buff.begin(), buff.end(), back_inserter(data));
-	//	type = msgtype;
-	//	length = sizeof(type) + sizeof(length) + data.size();
-	//}
-
-
     void join();
     
 private:
