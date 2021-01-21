@@ -25,41 +25,37 @@
 #include <boost/thread/mutex.hpp>
 
 #include <boost/thread/thread.hpp>
-#include <boost/lexical_cast.hpp>
 
 using boost::asio::ip::tcp;
 
 class msghub_impl : public hub
 {
-private:
+  public:
+    using any_io_executor = boost::asio::any_io_executor;
+
+  private:
 	typedef std::map < std::string, msghub::onmessage >::iterator messagemapit;
 	std::map < std::string, msghub::onmessage > messagemap_;
 
-private:
-	std::vector<boost::shared_ptr<boost::thread> > threads_;
-	boost::shared_ptr<hubconnection> publisher_;
-	boost::asio::io_service& io_service_;
-    boost::optional<boost::asio::io_service::work> work_;
+  private:
 	tcp::acceptor acceptor_;
+    boost::asio::executor_work_guard<any_io_executor> work_;
+	boost::shared_ptr<hubconnection> publisher_;
 	bool initok_;
 
-
-	void initpool(uint8_t threads);
-
-public:
-
-	msghub_impl(boost::asio::io_service& io_service);
+  public:
+	msghub_impl(any_io_executor io_service);
 	~msghub_impl();
-	bool connect(const std::string& hostip, uint16_t port, uint8_t threads = 1);
-	bool create(uint32_t port, uint8_t threads = 1);
-	void join();
+	bool connect(const std::string& hostip, uint16_t port);
+	bool create(uint16_t port);
 	bool publish(const std::string& topic, const std::vector<char>& message);
 	bool publish(const std::string& topic, const std::string& message);
 	bool unsubscribe(const std::string& topic);
 	bool subscribe(const std::string& topic, msghub::onmessage handler);
 
-public:
+    void stop();
 
+  public:
 	typedef std::set<boost::shared_ptr<hubclient>> subscriberset;
 	typedef std::map<std::string, subscriberset>::iterator subscribersit;
 	std::map<std::string, subscriberset> subscribers_;

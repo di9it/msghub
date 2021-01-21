@@ -27,71 +27,49 @@
 
 using boost::asio::ip::tcp;
 
-
-void msghub_impl::initpool(uint8_t threads)
-{
-	if (!threads)
-		threads++;
-
-	// Create a pool of threads to run all of the io_services.
-	while (threads--)
-	{
-		boost::shared_ptr<boost::thread> thread(
-			new boost::thread(boost::bind(&boost::asio::io_service::run, &io_service_)));
-
-		threads_.push_back(thread);
-	}
-}
-
-msghub_impl::msghub_impl(boost::asio::io_service& io_service)
-	: publisher_(new hubconnection(io_service.get_executor(), *this))
-	, io_service_(io_service)
-    , work_(boost::asio::io_service::work(io_service))
-	, acceptor_(io_service)
+msghub_impl::msghub_impl(boost::asio::any_io_executor executor)
+	: acceptor_(executor)
+    , work_(make_work_guard(executor))
+    , publisher_(new hubconnection(executor, *this))
 	, initok_(false)
 {}
 
+void msghub_impl::stop()
+{
+    if (publisher_)
+        publisher_->close(false);
+
+    publisher_.reset();
+
+    if (acceptor_.is_open()) 
+        acceptor_.cancel();
+
+    work_.reset();
+}
+
 msghub_impl::~msghub_impl()
 {
-    join();
+    stop();
 }
 
 
-bool msghub_impl::connect(const std::string& hostip, uint16_t port, uint8_t threads)
+bool msghub_impl::connect(const std::string& hostip, uint16_t port)
 {
-	initpool(threads);
 	initok_ = publisher_->init(hostip, port);
 	return initok_;
 }
 
-bool msghub_impl::create(uint32_t port, uint8_t threads)
+bool msghub_impl::create(uint16_t port)
 {
-	tcp::endpoint endpoint(tcp::v4(), port);
-	acceptor_ = tcp::acceptor(io_service_, endpoint);
-
+    acceptor_.open(tcp::v4());
     acceptor_.set_option(tcp::acceptor::reuse_address(true));
+	acceptor_.bind({{}, port});
 	acceptor_.listen();
 
 	accept_next();
 
-	initpool(threads);
 	initok_ = publisher_->init("localhost", port);
 	return initok_;
-}
-
-void msghub_impl::join()
-{
-    if (publisher_)
-        publisher_->close(false);
-    publisher_.reset();
-    if (acceptor_.is_open()) 
-        acceptor_.cancel();
-    work_.reset();
-
-	// Join to all service threads
-	for (auto it : threads_)
-        if (it->joinable())
-            it->join();
 }
 
 bool msghub_impl::publish(const std::string& topic, const std::vector<char>& message)
@@ -213,7 +191,7 @@ void msghub_impl::deliver(hubmessage& msg)
 
 void msghub_impl::accept_next()
 {
-	boost::shared_ptr<hubclient> subscriber(new hubclient(io_service_.get_executor(), *this));
+	boost::shared_ptr<hubclient> subscriber(new hubclient(acceptor_.get_executor(), *this));
 
 	// Schedule next accept
 	acceptor_.async_accept(subscriber->socket(),
@@ -226,12 +204,11 @@ void msghub_impl::handle_accept(boost::shared_ptr<hubclient> client, const boost
 	if (!error)
 	{
 		client->start();
+        accept_next();
 	}
 	else
 	{
 		//// TODO: Handle IO error - on thread exit
 		//int e = error.value();
 	}
-
-	accept_next();
 }

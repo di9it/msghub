@@ -16,35 +16,54 @@ Array may contain any serialized user data, but it's out of scope here.
 Examples
 --------
 
-I. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
-```c++
-	// Message handler
-	void on_message(const std::string& topic, std::vector<char> const& message)
-	{
-	   // handle message
-	}
+ 1. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
 
-	int main()
-	{
-		boost::asio::io_service io_service;
-		// Create hub to listen on 0xbee port
-		msghub msghub(io_service);
-		msghub.create(0xbee);
-		// Subscribe on "any topic"
-		msghub.subscribe("any topic", on_message);
-		// Current or any another client
-		msghub.publish("any topic", "new message");
-		io_service.run(); // keep server active
-	}
-```
-II. Connect to hub on "localhost" and publish "new message" into "any topic":
-```c++
-	int main()
-	{
-		boost::asio::io_service io_service;
-		msghub msghub(io_service);
-		msghub.connect("localhost", 0xbee);
-		msghub.publish("any topic", "new message");
-		// msghub.join(); // implied
-	}
-```
+    ```c++
+    // Message handler
+    void on_message(const std::string& topic, std::vector<char> const& message)
+    {
+        // handle message
+    }
+
+    int main()
+    {
+        boost::asio::io_context io;
+        // Create hub to listen on 0xbee port
+        msghub hub(io.get_executor());
+        hub.create(0xbee);
+        // Subscribe on "any topic"
+        hub.subscribe("any topic", on_message);
+        // Current or any another client
+        hub.publish("any topic", "new message");
+        io.run(); // keep server active
+    }
+    ```
+ 2. Connect to hub on "localhost" and publish "new message" into "any topic":
+
+    ```c++
+    int main()
+    {
+        boost::asio::io_context io;
+        msghub hub(io.get_executor());
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
+
+        hub.stop();
+        io.run();
+    }
+    ```
+
+ 3. Using multiple threads
+
+    ```c++
+    int main()
+    {
+        boost::asio::thread_pool io(5); // count optional
+        msghub hub(io.get_executor());
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
+
+        hub.stop();
+        io.join();
+    }
+    ```

@@ -17,8 +17,6 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
 
-#include <boost/lexical_cast.hpp>
-
 using boost::asio::ip::tcp;
 
 class hubconnection : public boost::enable_shared_from_this<hubconnection>

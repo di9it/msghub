@@ -13,11 +13,10 @@ bool hubconnection::init(const std::string& host, uint16_t port)
 	try
 	{
 		tcp::resolver resolver(socket_.get_executor());
-		tcp::resolver::query query(host, boost::lexical_cast<std::string>(port));
-		tcp::resolver::iterator iterator = resolver.resolve(query);
+        tcp::resolver::results_type results = resolver.resolve(host, std::to_string(port));
 
 		// Do blocking connect (connection is more important than subscription here)
-		connect(socket_, iterator);
+		connect(socket_, results);
 
 		// Schedule packet read
 		async_read(socket_,
@@ -125,12 +124,6 @@ void hubconnection::handle_write(error_code error)
 void hubconnection::do_close(bool forced)
 {
     is_closing = true; // atomic
-
-    {
-        auto* strand = socket_.get_executor()
-            .target<boost::asio::strand<boost::asio::io_context> >();
-        assert(strand && strand->running_in_this_thread());
-    }
 
 	// TODO: Unsubscribe?
 

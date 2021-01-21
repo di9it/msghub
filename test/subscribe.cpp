@@ -10,45 +10,45 @@
 #include <boost/test/test_tools.hpp>
 
 BOOST_AUTO_TEST_SUITE(message_hub)
+using namespace std::chrono_literals;
 
-static std::mutex mutant;
-static std::condition_variable newmessage;
+static std::mutex mx;
+static bool received = false;
 static bool goodmessage = false;
+static std::condition_variable newmessage;
 
 using namespace boost::unit_test;
 
 void test_create_on_message(const std::string& topic, std::vector<char> const& message)
 {
-	std::unique_lock<std::mutex> lock(mutant);
-	std::vector<char> expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'};
+    std::unique_lock<std::mutex> lock(mx);
+    std::vector<char> expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'};
+    received = true;
     goodmessage = (expected == message);
-	BOOST_CHECK_EQUAL("test_topic", topic);
+    BOOST_CHECK_EQUAL("test_topic", topic);
     BOOST_TEST(expected == message, boost::test_tools::per_element());
-	newmessage.notify_one();
-}
-
-bool publish_message(msghub& msghub)
-{
-	BOOST_CHECK(msghub.publish("test_topic", "$testmessage$"));
-	std::unique_lock<std::mutex> lock(mutant);
-	newmessage.wait(lock);
-	BOOST_CHECK(goodmessage);
-	return true;
+    newmessage.notify_one();
 }
 
 BOOST_AUTO_TEST_CASE(test_subscribe)
 {
-	boost::asio::io_service io_service;
-	msghub msghub(io_service);
-	BOOST_CHECK(msghub.create(0xBEE));
+	boost::asio::thread_pool io(1);
 
-	BOOST_CHECK(msghub.subscribe("test_topic", test_create_on_message));
+    msghub hub(io.get_executor());
+    BOOST_CHECK(hub.create(0xBEE));
 
-	unit_test_monitor_t& monitor = unit_test_monitor_t::instance();
-	monitor.p_timeout.set(1);
-	monitor.execute(boost::bind(publish_message, msghub));
-	io_service.stop();
-	//io_service1.stop();
+    BOOST_CHECK(hub.subscribe("test_topic", test_create_on_message));
+    BOOST_CHECK(hub.publish("test_topic", "$testmessage$"));
+
+    {
+        std::unique_lock<std::mutex> lock(mx);
+        BOOST_CHECK(newmessage.wait_for(lock, 1s, [] { return received; }));
+    }
+
+    hub.stop();
+    io.join();
+
+    BOOST_CHECK(goodmessage);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

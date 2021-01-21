@@ -2,24 +2,26 @@
 #include "msghub_impl.h"
 //#include 
 
-//#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/asio.hpp>
 
+msghub::~msghub() = default;
 
-msghub::msghub(boost::asio::io_service& s)
-{
-	pimpl = boost::make_shared<msghub_impl>(s);
+/*explicit*/ msghub::msghub(boost::asio::any_io_executor executor)
+ : pimpl(std::make_unique<msghub_impl>(executor))
+{ }
+
+void msghub::stop() {
+	return pimpl->stop();
 }
 
-bool msghub::connect(const std::string& hostip, uint16_t port, uint8_t threads)
+bool msghub::connect(const std::string& hostip, uint16_t port)
 {
-	return pimpl->connect(hostip, port, threads);
+	return pimpl->connect(hostip, port);
 }
 
-bool msghub::create(uint16_t port, uint8_t threads)
+bool msghub::create(uint16_t port)
 {
-	return pimpl->create(port, threads);
+	return pimpl->create(port);
 }
 
 bool msghub::unsubscribe(const std::string& topic)
@@ -40,9 +42,4 @@ bool msghub::publish(const std::string& topic, const std::vector<char>& message)
 bool msghub::publish(const std::string& topic, const std::string& message)
 {
 	return pimpl->publish(topic, message);
-}
-
-void msghub::join()
-{
-	return pimpl->join();
 }

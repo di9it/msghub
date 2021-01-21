@@ -8,15 +8,13 @@
 
 BOOST_AUTO_TEST_SUITE(message_hub)
 BOOST_AUTO_TEST_CASE(test_connect) {
-	{
-		boost::asio::io_service io_service;
+    boost::asio::io_context io;
 
-		msghub msghub1(io_service);
-		BOOST_CHECK(msghub1.create(0xBEE));
-		
-		BOOST_CHECK(msghub1.connect("localhost", 0xBEE));
-		io_service.stop();
-	}
+    msghub msghub1(io.get_executor());
+    BOOST_CHECK(msghub1.create(0xBEE));
+
+    BOOST_CHECK(msghub1.connect("localhost", 0xBEE));
+    io.stop();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
