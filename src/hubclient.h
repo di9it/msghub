@@ -12,30 +12,34 @@
 #include <vector>
 #include <deque>
 
-#include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
 
-#include <boost/thread/thread.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/mutex.hpp>
 
 using boost::asio::ip::tcp;
 
 class hubclient : public boost::enable_shared_from_this<hubclient>
 {
-public:
-	hubclient(boost::asio::io_service& io_service, hub& proc);
+  public:
+    template <typename Executor>
+	hubclient(Executor executor, hub& distrib)
+      : socket_(make_strand(executor))
+      , distributor_(distrib)
+    {}
+
 	tcp::socket& socket();
 	void start();
 	void write(const hubmessage& msg);
-	void handle_read_header(const boost::system::error_code& error);
-	void handle_read_body(const boost::system::error_code& error);
-	void handle_write(const boost::system::error_code& error);
+  private:
+    using error_code = boost::system::error_code;
+	void handle_read_header(error_code);
+	void handle_read_body(error_code);
+	void handle_write(error_code);
 
-private:
-	boost::mutex		write_msgs_lock_;
+    auto bind(void (hubclient::*)(error_code));
+  private:
 	tcp::socket			socket_;
 	hub&				distributor_;
 	hubmessage			inmsg_;

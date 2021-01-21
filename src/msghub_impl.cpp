@@ -213,7 +213,7 @@ void msghub_impl::deliver(hubmessage& msg)
 
 void msghub_impl::accept_next()
 {
-	boost::shared_ptr<hubclient> subscriber(new hubclient(io_service_, *this));
+	boost::shared_ptr<hubclient> subscriber(new hubclient(io_service_.get_executor(), *this));
 
 	// Schedule next accept
 	acceptor_.async_accept(subscriber->socket(),
