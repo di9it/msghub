@@ -9,11 +9,7 @@
 #include <iterator>
 #include <memory>
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/vector.hpp>
+#include "charbuf.h"
 
 class hubmessage
 {
@@ -41,7 +37,7 @@ private:
 	packet data_;
 
 public:
-	const char* data() const;
+	char const* data() const;
 	char* data();
 
 	hubmessage();
@@ -52,21 +48,24 @@ public:
 	size_t length() const;
 	//const char* payload() const;
 	
-	char* payload();
+    charbuf payload();
+    const_charbuf payload() const;
 	size_t payload_length() const;
 	
 	size_t topic_length() const;
-	char* topic();
+    std::string_view topic() const;
 	
 	action get_action() const;
 	void set_action(action action);
 
     packet::headers_t& headers();
     packet::headers_t const& headers() const;
-	char* body();
+
+    charbuf body();
+    const_charbuf body() const;
 	size_t body_length() const;
-	void set_message(const std::string& subj);
-	void set_message(const std::string& subj, const std::vector<char>& msg);
+    void set_message(std::string_view topic);
+    void set_message(std::string_view topic, const_charbuf msg);
 };
 
 typedef std::deque<hubmessage> hubmessage_queue;

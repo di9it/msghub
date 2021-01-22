@@ -1,24 +1,12 @@
 #include "hubmessage.h"
-//#include "msghub_types.h"
-//
-//#include <cstdint>
-//#include <cstdio>
-//#include <cstdlib>
-//#include <cstring>
-//#include <deque>
-//#include <iterator>
-//
-//#include <memory>
-//#include <boost/iostreams/device/array.hpp>
-//#include <boost/iostreams/stream.hpp>
-//#include <boost/archive/binary_oarchive.hpp>
-//#include <boost/archive/binary_iarchive.hpp>
-//#include <boost/serialization/vector.hpp>
+#include <charbuf.h>
+#include <string_view>
+#include <variant>
 
 hubmessage::hubmessage()
 {}
 
-const char* hubmessage::data() const
+char const* hubmessage::data() const
 {
 	return data_.data;
 }
@@ -39,20 +27,15 @@ size_t hubmessage::length() const
 	return header_length() + payload_length();
 }
 
-char* hubmessage::payload()
+charbuf hubmessage::payload()
 {
-	return headers().payload;
+	return {headers().payload, payload_length()};
 }
 
-char* hubmessage::topic()
+std::string_view hubmessage::topic() const
 {
-	return payload();
+	return {headers().payload, topic_length()};
 }
-
-//char* hubmessage::payload() const
-//{
-//	return headers().payload;
-//}
 
 size_t hubmessage::payload_length() const
 {
@@ -74,9 +57,14 @@ hubmessage::packet::headers_t const& hubmessage::headers() const
 	return data_.headers;
 }
 
-char* hubmessage::body()
+const_charbuf hubmessage::body() const
 {
-	return payload() + topic_length();
+	return {headers().payload + topic_length(), body_length()};
+}
+
+charbuf hubmessage::body()
+{
+	return {headers().payload + topic_length(), body_length()};
 }
 
 hubmessage::action hubmessage::get_action() const
@@ -89,24 +77,23 @@ void hubmessage::set_action(action action)
 	headers().msgaction = action;
 }
 
-void hubmessage::set_message(const std::string& subj)
+void hubmessage::set_message(std::string_view topic)
 {
-	memcpy(payload(), subj.c_str(), subj.length());
-	headers().topiclen = subj.length();
+	memcpy(payload().data(), topic.data(), topic.length());
+	headers().topiclen = topic.length();
 	headers().bodylen = 0;
 	headers().magic = cookie;
 }
 
-void hubmessage::set_message(const std::string& subj, const std::vector<char>& msg)
+void hubmessage::set_message(std::string_view topic, const_charbuf msg)
 {
-	set_message(subj);
+	set_message(topic);
 	headers().bodylen = msg.size();
-	if (header_length() + msg.size() > messagesize)
-	{
+	if (header_length() + msg.size() + topic_length() > messagesize) {
 		throw std::out_of_range("Povided message is too big");
 	}
 
-	memcpy(payload() + headers().topiclen, msg.data(), msg.size());
+	memcpy(payload().data() + topic_length(), msg.data(), msg.size());
 }
 
 size_t hubmessage::body_length() const
@@ -116,8 +103,5 @@ size_t hubmessage::body_length() const
 
 bool hubmessage::verify() const
 {
-	if (headers().magic != cookie)
-		return false;
-
-	return true;
+    return headers().magic == cookie;
 }

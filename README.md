@@ -20,7 +20,7 @@ Examples
 
     ```c++
     // Message handler
-    void on_message(const std::string& topic, std::vector<char> const& message)
+    void on_message(std::string_view topic, const_charbuf message)
     {
         // handle message
     }
@@ -67,3 +67,4 @@ Examples
         io.join();
     }
     ```
+Note: `const_charbuf` is `std::span<char const>` on c++20 capable compilers.

@@ -3,6 +3,7 @@
 using boost::asio::ip::tcp;
 
 auto hubclient::bind(void (hubclient::*handler)(error_code)) {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
     return [=, self = shared_from_this()](error_code ec, size_t /*transferred*/) {
         (this->*handler)(ec);
     };
@@ -41,7 +42,7 @@ void hubclient::handle_read_header(error_code error)
 	{
 		// Decode header and schedule message handling itself
 		boost::asio::async_read(socket_,
-			boost::asio::buffer(inmsg_.payload(), inmsg_.payload_length()),
+			boost::asio::buffer(inmsg_.payload()),
 			bind(&hubclient::handle_read_body));
 	}
 	else

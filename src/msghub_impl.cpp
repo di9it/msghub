@@ -6,6 +6,7 @@
 #include "hubclient.h"
 #include "hubmessage.h"
 
+#include <charbuf.h>
 #include <memory>
 #include <cstdlib>
 #include <functional>
@@ -14,23 +15,16 @@
 
 #include <vector>
 #include <map>
-#include <set>
 
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
-#include <boost/thread/mutex.hpp>
-
-#include <boost/thread/thread.hpp>
-#include <boost/lexical_cast.hpp>
+#include <boost/range/iterator_range.hpp>
 
 using boost::asio::ip::tcp;
 
 msghub_impl::msghub_impl(boost::asio::any_io_executor executor)
-	: acceptor_(executor)
+	: acceptor_(make_strand(executor))
     , work_(make_work_guard(executor))
-    , publisher_(new hubconnection(executor, *this))
+    , publisher_(std::make_shared<hubconnection>(executor, *this))
 	, initok_(false)
 {}
 
@@ -72,7 +66,7 @@ bool msghub_impl::create(uint16_t port)
 	return initok_;
 }
 
-bool msghub_impl::publish(const std::string& topic, const std::vector<char>& message)
+bool msghub_impl::publish(std::string_view topic, const_charbuf message)
 {
 	if (!initok_)
 		return false;
@@ -83,13 +77,6 @@ bool msghub_impl::publish(const std::string& topic, const std::vector<char>& mes
 	publisher_->write(msg);
 
 	return true;
-}
-
-bool msghub_impl::publish(const std::string& topic, const std::string& message)
-{
-	std::vector<char> data;
-	std::copy(message.begin(), message.end(), back_inserter(data));
-	return publish(topic, data);
 }
 
 bool msghub_impl::unsubscribe(const std::string& topic)
@@ -112,7 +99,7 @@ bool msghub_impl::subscribe(const std::string& topic, msghub::onmessage handler)
 	if (!initok_)
 		return false;
 
-	messagemapit it = messagemap_.find(topic);
+	auto it = messagemap_.find(topic);
 	if (it != messagemap_.end())
 	{
 		// Overwrite
@@ -133,43 +120,29 @@ bool msghub_impl::subscribe(const std::string& topic, msghub::onmessage handler)
 	return true;
 }
 
-void msghub_impl::distribute(boost::shared_ptr<hubclient> subscriber, hubmessage& msg)
+void msghub_impl::distribute(std::shared_ptr<hubclient> const& subscriber, hubmessage const& msg)
 {
-	boost::mutex::scoped_lock lock(subscriberslock_);
+    //post(acceptor_.get_executor(), do
+	std::string topic(msg.topic());
+	auto range = boost::make_iterator_range(subscribers_.equal_range(topic));
 
-	std::string topic(msg.payload(), msg.topic_length());
-	subscribersit it = subscribers_.find(topic);
 	switch (msg.get_action())
 	{
 	case hubmessage::action::publish:
-		if (it != subscribers_.end())
-		{
-			for (auto s : it->second)
-				s->write(msg);
-		}
-		break;
+        for (auto& [t,s] : range)
+            s->write(msg);
+        break;
 
 	case hubmessage::action::subscribe:
-		if (it != subscribers_.end())
-		{
-			it->second.insert(subscriber);
-		}
-		else
-		{
-			subscriberset newsubscribers;
-			newsubscribers.insert(subscriber);
-			subscribers_.insert(std::make_pair(topic, newsubscribers));
-		}
+        subscribers_.emplace(topic, subscriber);
 		break;
 
 	case hubmessage::action::unsubscribe:
-		if (it != subscribers_.end())
-		{
-			it->second.erase(subscriber);
-			if (!it->second.size())
-			{
-				subscribers_.erase(it);
-			}
+        for (auto it = range.begin(); it != range.end();) {
+            if (it->second == subscriber)
+                it = subscribers_.erase(it);
+            else
+                ++it;
 		}
 		break;
 
@@ -178,28 +151,27 @@ void msghub_impl::distribute(boost::shared_ptr<hubclient> subscriber, hubmessage
 	}
 }
 
-void msghub_impl::deliver(hubmessage& msg)
-{
-	std::string topic(msg.payload(), msg.topic_length());
-	messagemapit it = messagemap_.find(topic);
-	if (it != messagemap_.end())
-	{
-		std::vector<char> message(msg.body(), msg.body() + msg.body_length());
-		it->second(topic, message);
+void msghub_impl::deliver(hubmessage const& msg)
+{ 
+	if (auto it = messagemap_.find(std::string(msg.topic()));
+            it != messagemap_.end())
+    {
+		it->second(msg.topic(), msg.body());
 	}
 }
 
 void msghub_impl::accept_next()
 {
-	boost::shared_ptr<hubclient> subscriber(new hubclient(acceptor_.get_executor(), *this));
+    auto subscriber = std::make_shared<hubclient>(acceptor_.get_executor(), *this);
 
 	// Schedule next accept
 	acceptor_.async_accept(subscriber->socket(),
-		boost::bind(&msghub_impl::handle_accept, this, subscriber,
-		boost::asio::placeholders::error));
+        [=, this, self = shared_from_this()](boost::system::error_code ec) {
+            handle_accept(subscriber, ec);
+        });
 }
 
-void msghub_impl::handle_accept(boost::shared_ptr<hubclient> client, const boost::system::error_code& error)
+void msghub_impl::handle_accept(std::shared_ptr<hubclient> const& client, const boost::system::error_code& error)
 {
 	if (!error)
 	{

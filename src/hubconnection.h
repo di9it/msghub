@@ -13,13 +13,11 @@
 #include <deque>
 
 #include <boost/atomic.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
 
-class hubconnection : public boost::enable_shared_from_this<hubconnection>
+class hubconnection : public std::enable_shared_from_this<hubconnection>
 {
 public:
     template <typename Executor>
@@ -44,11 +42,11 @@ private:
 	void do_close(bool forced);
 
 private:
-	tcp::socket					socket_;
-	hub&						courier_;
-	hubmessage					inmsg_;
-	hubmessage_queue			outmsg_queue_;
-	boost::atomic_bool			is_closing;
+	tcp::socket        socket_;
+	hub&               courier_;
+	hubmessage         inmsg_;
+	hubmessage_queue   outmsg_queue_;
+	boost::atomic_bool is_closing;
 };
 
 #endif

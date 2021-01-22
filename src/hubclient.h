@@ -12,15 +12,11 @@
 #include <vector>
 #include <deque>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
-
-#include <boost/lexical_cast.hpp>
 
 using boost::asio::ip::tcp;
 
-class hubclient : public boost::enable_shared_from_this<hubclient>
+class hubclient : public std::enable_shared_from_this<hubclient>
 {
   public:
     template <typename Executor>

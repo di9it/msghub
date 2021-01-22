@@ -3,6 +3,7 @@
 using boost::asio::ip::tcp;
 
 auto hubconnection::bind(void (hubconnection::*handler)(error_code)) {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
     return [=, self=shared_from_this()](error_code ec, size_t /*transferred*/) {
         (this->*handler)(ec);
     };
@@ -20,7 +21,7 @@ bool hubconnection::init(const std::string& host, uint16_t port)
 
 		// Schedule packet read
 		async_read(socket_,
-			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
+			boost::asio::buffer(&inmsg_.headers(), inmsg_.header_length()),
 			bind(&hubconnection::handle_read_header));
 	}
 	catch (std::exception&)
@@ -41,6 +42,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 		}
 		else
 		{
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
 			post(socket_.get_executor(), [=, self=shared_from_this()]
                 { do_write(msg); });
 		}
@@ -55,6 +57,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 
 void hubconnection::close(bool forced)
 {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
 	post(socket_.get_executor(), [=, self=shared_from_this()]
         { do_close(forced); });
 }
@@ -65,7 +68,7 @@ void hubconnection::handle_read_header(error_code error)
 	{
 		async_read(
 			socket_,
-			boost::asio::buffer(inmsg_.payload(), inmsg_.payload_length()),
+			boost::asio::buffer(inmsg_.payload()),
 			bind(&hubconnection::handle_read_body));
 	}
 	else

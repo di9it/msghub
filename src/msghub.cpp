@@ -7,7 +7,7 @@
 msghub::~msghub() = default;
 
 /*explicit*/ msghub::msghub(boost::asio::any_io_executor executor)
- : pimpl(std::make_unique<msghub_impl>(executor))
+ : pimpl(std::make_shared<msghub_impl>(executor))
 { }
 
 void msghub::stop() {
@@ -34,12 +34,7 @@ bool msghub::subscribe(const std::string& topic, onmessage handler)
 	return pimpl->subscribe(topic, handler);
 }
 
-bool msghub::publish(const std::string& topic, const std::vector<char>& message)
-{
-	return pimpl->publish(topic, message);
-}
-
-bool msghub::publish(const std::string& topic, const std::string& message)
+bool msghub::publish(std::string_view topic, const_charbuf message)
 {
 	return pimpl->publish(topic, message);
 }

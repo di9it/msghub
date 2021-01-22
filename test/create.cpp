@@ -10,10 +10,8 @@ BOOST_AUTO_TEST_SUITE(message_hub)
 
 BOOST_AUTO_TEST_CASE(test_create)
 {
-	// Create 2 instances with same address and port, second shoul fail
 	{
 		boost::asio::io_context io;
-		//boost::asio::io_service io_service2;
 		
 		msghub msghub1(io.get_executor());
 		BOOST_CHECK(msghub1.create(0xBEE));
