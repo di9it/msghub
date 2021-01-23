@@ -23,7 +23,7 @@ void hubclient::write(const hubmessage& msg)
 {
     post(socket_.get_executor(), [this, msg, self=shared_from_this()]{
         bool write_in_progress = !outmsg_queue_.empty();
-        outmsg_queue_.push_back(msg);
+        outmsg_queue_.push_back(std::move(msg));
         if (!write_in_progress)
         {
             async_write(socket_,

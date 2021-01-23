@@ -3,9 +3,9 @@
 #include <string_view>
 
 hubmessage::hubmessage(action action_, std::string_view topic, const_charbuf msg)
-    : headers_ {}, payload_{}
+    : headers_ {}, payload_(topic.size() + msg.size())
 {
-	if (topic.size() + msg.size() > payload_.max_size()) {
+	if (topic.size() + msg.size() > (messagesize - sizeof(headers_))) {
 		throw std::length_error("messagesize");
 	}
 

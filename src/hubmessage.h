@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "charbuf.h"
+#include <boost/container/small_vector.hpp>
 
 class hubmessage
 {
@@ -37,7 +38,7 @@ class hubmessage
 	#pragma pack(pop)
 
     headers_t headers_;
-    std::array<char, messagesize - sizeof(headers_)> payload_;
+    boost::container::small_vector<char, 242> payload_;
 
   public:
     // input buffer views
@@ -46,14 +47,15 @@ class hubmessage
     }
 
     auto payload_area() {
-        return boost::asio::buffer(payload_, headers_.topiclen + headers_.bodylen);
+        payload_.resize(headers_.topiclen + headers_.bodylen);
+        return boost::asio::buffer(payload_.data(), payload_.size());
     }
 
     // output buffer views
     auto on_the_wire() const {
         return std::vector { 
             boost::asio::buffer(&headers_, sizeof(headers_)),
-            boost::asio::buffer(payload_, headers_.topiclen + headers_.bodylen),
+            boost::asio::buffer(payload_.data(), payload_.size())
         };
     }
 };

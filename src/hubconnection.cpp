@@ -42,7 +42,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 		{
 #pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
 			post(socket_.get_executor(), [=, self=shared_from_this()]
-                { do_write(msg); });
+                { do_write(std::move(msg)); });
 		}
         return true;
 	}
@@ -86,7 +86,7 @@ void hubconnection::handle_read_body(error_code error)
 
 void hubconnection::do_write(hubmessage msg)
 {
-	if (outmsg_queue_.push_back(msg); 1 == outmsg_queue_.size())
+	if (outmsg_queue_.push_back(std::move(msg)); 1 == outmsg_queue_.size())
 	{
 		async_write(socket_,
 			outmsg_queue_.front().on_the_wire(),
