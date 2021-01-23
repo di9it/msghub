@@ -20,9 +20,7 @@ bool hubconnection::init(const std::string& host, uint16_t port)
 		connect(socket_, results);
 
 		// Schedule packet read
-		async_read(socket_,
-			boost::asio::buffer(&inmsg_.headers(), inmsg_.header_length()),
-			bind(&hubconnection::handle_read_header));
+		async_read(socket_, inmsg_.header_buf(), bind(&hubconnection::handle_read_header));
 	}
 	catch (std::exception&)
 	{
@@ -38,7 +36,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 	{
 		if (wait)
 		{
-            boost::asio::write(socket_, boost::asio::buffer(msg.data(), msg.length()));
+            boost::asio::write(socket_, msg.on_the_wire());
 		}
 		else
 		{
@@ -52,7 +50,6 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 	{
 		return false;
 	}
-
 }
 
 void hubconnection::close(bool forced)
@@ -64,17 +61,14 @@ void hubconnection::close(bool forced)
 
 void hubconnection::handle_read_header(error_code error)
 {
-	if (!error && inmsg_.verify())
-	{
-		async_read(
-			socket_,
-			boost::asio::buffer(inmsg_.payload()),
-			bind(&hubconnection::handle_read_body));
-	}
-	else
-	{
-		do_close(true);
-	}
+    if (!error && inmsg_.verify())
+    {
+        async_read(socket_, inmsg_.payload_area(), bind(&hubconnection::handle_read_body));
+    }
+    else
+    {
+        do_close(true);
+    }
 }
 
 void hubconnection::handle_read_body(error_code error)
@@ -82,10 +76,7 @@ void hubconnection::handle_read_body(error_code error)
 	if (!error)
 	{
 		courier_.deliver(inmsg_);
-
-		async_read(socket_,
-			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
-			bind(&hubconnection::handle_read_header));
+		async_read(socket_, inmsg_.header_buf(), bind(&hubconnection::handle_read_header));
 	}
 	else
 	{
@@ -98,8 +89,7 @@ void hubconnection::do_write(hubmessage msg)
 	if (outmsg_queue_.push_back(msg); 1 == outmsg_queue_.size())
 	{
 		async_write(socket_,
-			boost::asio::buffer(outmsg_queue_.front().data(),
-			outmsg_queue_.front().length()),
+			outmsg_queue_.front().on_the_wire(),
 			bind(&hubconnection::handle_write));
 	}
 }
@@ -111,8 +101,7 @@ void hubconnection::handle_write(error_code error)
         if (outmsg_queue_.pop_front(); !outmsg_queue_.empty())
 		{
 			async_write(socket_,
-				boost::asio::buffer(outmsg_queue_.front().data(),
-				outmsg_queue_.front().length()),
+				outmsg_queue_.front().on_the_wire(),
 				bind(&hubconnection::handle_write));
         } else if (is_closing) {
             do_close(false);

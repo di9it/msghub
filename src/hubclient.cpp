@@ -16,9 +16,7 @@ tcp::socket& hubclient::socket() {
 void hubclient::start()
 {
 	// First read tiny header for verification
-	async_read(socket_,
-		boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
-        bind(&hubclient::handle_read_header));
+	async_read(socket_, inmsg_.header_buf(), bind(&hubclient::handle_read_header));
 }
 
 void hubclient::write(const hubmessage& msg)
@@ -29,8 +27,7 @@ void hubclient::write(const hubmessage& msg)
         if (!write_in_progress)
         {
             async_write(socket_,
-                boost::asio::buffer(outmsg_queue_.front().data(),
-                outmsg_queue_.front().length()),
+                outmsg_queue_.front().on_the_wire(),
                 bind(&hubclient::handle_write));
         }
     });
@@ -38,51 +35,36 @@ void hubclient::write(const hubmessage& msg)
 
 void hubclient::handle_read_header(error_code error)
 {
-	if (!error && inmsg_.verify())
-	{
-		// Decode header and schedule message handling itself
-		boost::asio::async_read(socket_,
-			boost::asio::buffer(inmsg_.payload()),
-			bind(&hubclient::handle_read_body));
-	}
-	else
-	{
-		// error or wrong header - ignore the message
-	}
+	if (!error && inmsg_.verify()) {
+		// read decoded payload size
+		async_read(socket_, inmsg_.payload_area(), bind(&hubclient::handle_read_body));
+    }
+
+    // TODO handle invalid headers (connection reset?)
 }
 
 void hubclient::handle_read_body(error_code error)
 {
-	if (!error)
-	{
+	if (!error) {
 		distributor_.distribute(shared_from_this(), inmsg_);
 
 		// Get next
-		boost::asio::async_read(socket_,
-			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
-			bind(&hubclient::handle_read_header));
+		async_read(socket_, inmsg_.header_buf(), bind(&hubclient::handle_read_header));
 	}
-	else
-	{
-		// error
-	}
+    // TODO handle IO failure
 }
 
 void hubclient::handle_write(error_code error)
 {
 	if (!error) {
 		outmsg_queue_.pop_front();
-		if (!outmsg_queue_.empty())
-		{
+
+		if (!outmsg_queue_.empty()) {
 			// Write next from queue // TODO remove duplication
             async_write(socket_,
-                boost::asio::buffer(outmsg_queue_.front().data(),
-                outmsg_queue_.front().length()),
+                outmsg_queue_.front().on_the_wire(),
                 bind(&hubclient::handle_write));
 		}
 	}
-	else
-	{
-		// error TODO handling
-	}
+    // error TODO handling
 }

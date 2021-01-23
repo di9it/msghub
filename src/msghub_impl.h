@@ -30,7 +30,6 @@ class msghub_impl
 	tcp::acceptor acceptor_;
     boost::asio::executor_work_guard<any_io_executor> work_;
 	std::shared_ptr<hubconnection> publisher_;
-	bool initok_;
 
   public:
 	msghub_impl(any_io_executor io_service);
@@ -45,7 +44,7 @@ class msghub_impl
     void stop();
 
   public:
-	std::multimap<std::string, std::shared_ptr<hubclient> > subscribers_;
+	std::multimap<std::string, std::shared_ptr<hubclient> > client_subs_;
 
 	void distribute(std::shared_ptr<hubclient> const& subscriber, hubmessage const& msg);
 	void deliver(hubmessage const& msg);

@@ -13,19 +13,17 @@
 #include <algorithm>
 #include <vector>
 
+#include <string>
 #include <vector>
 #include <map>
 
 #include <boost/asio.hpp>
-#include <boost/range/iterator_range.hpp>
 
 using boost::asio::ip::tcp;
 
 msghub_impl::msghub_impl(boost::asio::any_io_executor executor)
 	: acceptor_(make_strand(executor))
     , work_(make_work_guard(executor))
-    , publisher_(std::make_shared<hubconnection>(executor, *this))
-	, initok_(false)
 {}
 
 void msghub_impl::stop()
@@ -49,100 +47,90 @@ msghub_impl::~msghub_impl()
 
 bool msghub_impl::connect(const std::string& hostip, uint16_t port)
 {
-	initok_ = publisher_->init(hostip, port);
-	return initok_;
+    auto p = std::make_shared<hubconnection>(acceptor_.get_executor(), *this);
+
+    if (p->init(hostip, port)) {
+        publisher_ = p;
+    }
+
+	return publisher_.get();
 }
 
 bool msghub_impl::create(uint16_t port)
 {
-    acceptor_.open(tcp::v4());
-    acceptor_.set_option(tcp::acceptor::reuse_address(true));
-	acceptor_.bind({{}, port});
-	acceptor_.listen();
+    try {
+        acceptor_.open(tcp::v4());
+        acceptor_.set_option(tcp::acceptor::reuse_address(true));
+        acceptor_.bind({{}, port});
+        acceptor_.listen();
 
-	accept_next();
+        accept_next();
 
-	initok_ = publisher_->init("localhost", port);
-	return initok_;
+        auto p = std::make_shared<hubconnection>(
+                acceptor_.get_executor(),
+                *this);
+
+        if (p->init("localhost", port))
+            publisher_ = p;
+
+        return publisher_.get();
+    } catch(boost::system::system_error const&) {
+        return false;
+    }
 }
 
 bool msghub_impl::publish(std::string_view topic, const_charbuf message)
 {
-	if (!initok_)
-		return false;
-
-	hubmessage msg;
-	msg.set_message(topic, message);
-	msg.set_action(hubmessage::action::publish);
-	publisher_->write(msg);
-
-	return true;
+	if (publisher_) {
+        return publisher_->write({hubmessage::action::publish, topic, message});
+    }
+    return false;
 }
 
 bool msghub_impl::unsubscribe(const std::string& topic)
 {
-	if (!initok_)
-		return false;
-
-	if (messagemap_.find(topic) != messagemap_.end())
-	{
-		hubmessage msg;
-		msg.set_message(topic);
-		msg.set_action(hubmessage::action::unsubscribe);
-		publisher_->write(msg, true);
+	if (publisher_ && messagemap_.find(topic) != messagemap_.end()) {
+		return publisher_->write({hubmessage::action::unsubscribe, topic}, true);
 	}
-	return true;
+	return false;
 }
 
 bool msghub_impl::subscribe(const std::string& topic, msghub::onmessage handler)
 {
-	if (!initok_)
-		return false;
+	if (auto [it,ok] = messagemap_.emplace(topic, handler); !ok) {
+        it->second = handler; // overwrite
+    }
 
-	auto it = messagemap_.find(topic);
-	if (it != messagemap_.end())
-	{
-		// Overwrite
-		it->second = handler;
-	}
-	else
-	{
-		// New handler
-		messagemap_.insert(std::make_pair(topic, handler));
-	}
+    if (publisher_) {
+        return publisher_->write({hubmessage::action::subscribe, topic}, true);
+    }
 
-	hubmessage msg;
-	msg.set_message(topic);
-	msg.set_action(hubmessage::action::subscribe);
-	publisher_->write(msg, true);
-
-	// TODO: wait feedback form server here?
-	return true;
+	// TODO: wait feedback from server here?
+	return false;
 }
 
 void msghub_impl::distribute(std::shared_ptr<hubclient> const& subscriber, hubmessage const& msg)
 {
     //post(acceptor_.get_executor(), do
 	std::string topic(msg.topic());
-	auto range = boost::make_iterator_range(subscribers_.equal_range(topic));
+	auto range = client_subs_.equal_range(topic);
 
 	switch (msg.get_action())
 	{
 	case hubmessage::action::publish:
-        for (auto& [t,s] : range)
-            s->write(msg);
+        for (auto it = range.first; it != range.second; ++it)
+            it->second->write(msg);
         break;
 
 	case hubmessage::action::subscribe:
-        subscribers_.emplace(topic, subscriber);
+        client_subs_.emplace(topic, subscriber);
 		break;
 
 	case hubmessage::action::unsubscribe:
-        for (auto it = range.begin(); it != range.end();) {
+        for (auto it = range.first; it != range.second;) {
             if (it->second == subscriber)
-                it = subscribers_.erase(it);
-            else
-                ++it;
+                it = client_subs_.erase(it);
+            else ++it;
 		}
 		break;
 
