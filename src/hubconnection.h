@@ -1,27 +1,23 @@
-#ifndef _MSGHUB_HUBCONNECTION_H_
-#define _MSGHUB_HUBCONNECTION_H_
+#pragma once
 
-#include "hub.h"
+#include "ihub.h"
 #include "hubmessage.h"
 
 #include <string>
 #include <memory>
-#include <cstdlib>
 #include <functional>
-#include <algorithm>
-#include <vector>
-#include <deque>
 
 #include <boost/atomic.hpp>
 #include <boost/asio.hpp>
 
+namespace msghublib { namespace detail {
 using boost::asio::ip::tcp;
 
 class hubconnection : public std::enable_shared_from_this<hubconnection>
 {
 public:
     template <typename Executor>
-	hubconnection(Executor executor, hub& courier)
+	hubconnection(Executor executor, ihub& courier)
         : socket_(make_strand(executor))
         , courier_(courier)
         , is_closing(false)
@@ -43,10 +39,10 @@ private:
 
 private:
 	tcp::socket        socket_;
-	hub&               courier_;
+	ihub&              courier_;
 	hubmessage         inmsg_;
 	hubmessage_queue   outmsg_queue_;
 	boost::atomic_bool is_closing;
 };
 
-#endif
+} }

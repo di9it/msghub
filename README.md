@@ -19,8 +19,10 @@ Examples
  1. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
 
     ```c++
+    namespace mh = msghublib;
+
     // Message handler
-    void on_message(std::string_view topic, span<char const> message)
+    void on_message(std::string_view topic, mh::span<char const> message)
     {
         // handle message
     }
@@ -29,7 +31,7 @@ Examples
     {
         boost::asio::io_context io;
         // Create hub to listen on 0xbee port
-        msghub hub(io.get_executor());
+        mh::msghub hub(io.get_executor());
         if (!hub.create(0xbee)) {
             std::cerr << "Couldn't create hub\n";
         } else {
@@ -46,10 +48,12 @@ Examples
  2. Connect to hub on "localhost" and publish "new message" into "any topic":
 
     ```c++
+    namespace mh = msghublib;
+
     int main()
     {
         boost::asio::io_context io;
-        msghub hub(io.get_executor());
+        mh::msghub hub(io.get_executor());
         if (hub.connect("localhost", 0xbee)) {
             /*bool ok = */hub.publish("any topic", "new message");
         }
@@ -62,10 +66,12 @@ Examples
  3. Using multiple threads
 
     ```c++
+    namespace mh = msghublib;
+
     int main()
     {
         boost::asio::thread_pool io(5); // count optional
-        msghub hub(io.get_executor());
+        mh::msghub hub(io.get_executor());
         if (hub.connect("localhost", 0xbee)) {
             /*bool ok = */hub.publish("any topic", "new message");
         }

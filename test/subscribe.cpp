@@ -19,7 +19,7 @@ namespace {
     bool goodmessage = false;
     std::condition_variable newmessage;
 
-    void test_create_on_message(std::string_view topic, span<char const> message)
+    void test_create_on_message(std::string_view topic, msghublib::span<char const> message)
     {
         std::unique_lock<std::mutex> lock(mx);
         std::vector<char>
@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(test_subscribe)
 {
 	boost::asio::thread_pool io(1);
 
-    msghub hub(io.get_executor());
+    msghublib::msghub hub(io.get_executor());
     BOOST_CHECK(hub.create(0xBEE));
 
     BOOST_CHECK(hub.subscribe("test_topic", test_create_on_message));

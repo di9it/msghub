@@ -1,15 +1,13 @@
-#ifndef _MSGHUB_HUBMESSAGE_H_
-#define _MSGHUB_HUBMESSAGE_H_
+#pragma once
 
-#include <array>
-#include <cstddef>
 #include <functional>
 #include <string_view>
-#include <iterator>
-#include <vector>
 
 #include "span.h"
 #include <boost/container/small_vector.hpp>
+#include <deque>
+
+namespace msghublib {
 
 class hubmessage
 {
@@ -60,7 +58,6 @@ class hubmessage
     }
 };
 
-#include <deque>
 typedef std::deque<hubmessage> hubmessage_queue;
 
-#endif
+}
