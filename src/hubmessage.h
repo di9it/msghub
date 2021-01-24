@@ -8,7 +8,7 @@
 #include <iterator>
 #include <vector>
 
-#include "charbuf.h"
+#include "span.h"
 #include <boost/container/small_vector.hpp>
 
 class hubmessage
@@ -19,13 +19,13 @@ class hubmessage
 	enum { cookie = 0xF00D ^ (version << 8) };
 	enum { messagesize = 0x2000 };
 
-    hubmessage(action a={}, std::string_view topic={}, const_charbuf msg = {});
+    hubmessage(action a={}, std::string_view topic={}, span<char const> msg = {});
 
 	bool             verify()     const;
 
 	action           get_action() const;
 	std::string_view topic()      const;
-	const_charbuf    body()       const;
+	span<char const> body()       const;
 
   private:
 	#pragma pack(push, 1)

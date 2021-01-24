@@ -10,28 +10,29 @@
 #include <boost/test/test_tools.hpp>
 
 BOOST_AUTO_TEST_SUITE(message_hub)
-using namespace std::chrono_literals;
 
-static std::mutex mx;
-static bool received = false;
-static bool goodmessage = false;
-static std::condition_variable newmessage;
+namespace {
+    using namespace std::chrono_literals;
 
-using namespace boost::unit_test;
+    std::mutex mx;
+    bool received = false;
+    bool goodmessage = false;
+    std::condition_variable newmessage;
 
-void test_create_on_message(std::string_view topic, const_charbuf message)
-{
-    std::unique_lock<std::mutex> lock(mx);
-    std::vector<char>
-        expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'},
-        actual(message.begin(), message.end());
+    void test_create_on_message(std::string_view topic, span<char const> message)
+    {
+        std::unique_lock<std::mutex> lock(mx);
+        std::vector<char>
+            expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'},
+            actual(message.begin(), message.end());
 
-    received = true;
-    goodmessage = (expected == actual);
+        received = true;
+        goodmessage = (expected == actual);
 
-    BOOST_CHECK_EQUAL("test_topic", topic);
-    BOOST_TEST(expected == message, boost::test_tools::per_element());
-    newmessage.notify_one();
+        BOOST_CHECK_EQUAL("test_topic", topic);
+        BOOST_TEST(expected == message, boost::test_tools::per_element());
+        newmessage.notify_one();
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_subscribe)

@@ -45,6 +45,3 @@ namespace boost::asio {
         return buffer(span.data(), span.size() * sizeof(T));
     }
 }
-
-using charbuf = span<char>;
-using const_charbuf = span<char const>;

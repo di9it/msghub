@@ -6,7 +6,7 @@
 #include "hubclient.h"
 #include "hubmessage.h"
 
-#include <charbuf.h>
+#include <span.h>
 #include <memory>
 #include <cstdlib>
 #include <functional>
@@ -79,7 +79,7 @@ bool msghub_impl::create(uint16_t port)
     }
 }
 
-bool msghub_impl::publish(std::string_view topic, const_charbuf message)
+bool msghub_impl::publish(std::string_view topic, span<char const> message)
 {
 	if (publisher_) {
         return publisher_->write({hubmessage::action::publish, topic, message});

@@ -7,13 +7,13 @@
 
 #include <memory>
 #include <boost/asio.hpp>
-#include "charbuf.h"
+#include "span.h"
 
 class msghub_impl;
 class msghub
 {
   public:
-    typedef std::function< void(std::string_view topic, const_charbuf message) > onmessage;
+    typedef std::function< void(std::string_view topic, span<char const> message) > onmessage;
     
   public:
     explicit msghub(boost::asio::any_io_executor);
@@ -24,13 +24,13 @@ class msghub
 
     bool unsubscribe(const std::string& topic);
     bool subscribe(const std::string& topic, onmessage handler);
-    bool publish(std::string_view topic, const_charbuf message);
+    bool publish(std::string_view topic, span<char const> message);
 
     // Treat string literals specially, not including the terminating NUL
     template <size_t N>
 	bool publish(std::string_view topic, char const (&literal)[N]) {
         static_assert(N>0);
-        return publish(topic, const_charbuf{literal, N-1});
+        return publish(topic, span<char const>{literal, N-1});
     }
 
     void stop();

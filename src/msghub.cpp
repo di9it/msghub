@@ -34,7 +34,7 @@ bool msghub::subscribe(const std::string& topic, onmessage handler)
 	return pimpl->subscribe(topic, handler);
 }
 
-bool msghub::publish(std::string_view topic, const_charbuf message)
+bool msghub::publish(std::string_view topic, span<char const> message)
 {
 	return pimpl->publish(topic, message);
 }

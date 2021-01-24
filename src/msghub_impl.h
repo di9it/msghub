@@ -36,7 +36,7 @@ class msghub_impl
 	~msghub_impl();
 	bool connect(const std::string& hostip, uint16_t port);
 	bool create(uint16_t port);
-	bool publish(std::string_view topic, const_charbuf message);
+	bool publish(std::string_view topic, span<char const> message);
 
 	bool unsubscribe(const std::string& topic);
 	bool subscribe(const std::string& topic, msghub::onmessage handler);

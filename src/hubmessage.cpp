@@ -1,8 +1,8 @@
 #include "hubmessage.h"
-#include <charbuf.h>
+#include <span.h>
 #include <string_view>
 
-hubmessage::hubmessage(action action_, std::string_view topic, const_charbuf msg)
+hubmessage::hubmessage(action action_, std::string_view topic, span<char const> msg)
     : headers_ {}, payload_(topic.size() + msg.size())
 {
 	if (topic.size() + msg.size() > (messagesize - sizeof(headers_))) {
@@ -34,7 +34,7 @@ std::string_view hubmessage::topic() const {
         .substr(0, headers_.topiclen);
 }
 
-const_charbuf hubmessage::body() const {
+span<char const> hubmessage::body() const {
     return
         std::string_view(payload_.data(), payload_.size())
         .substr(headers_.topiclen, headers_.bodylen);
