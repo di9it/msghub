@@ -1,16 +1,12 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <cstdint>
-
 #include <memory>
 #include <boost/asio.hpp>
+#include <string>
+#include <string_view>
 #include "span.h"
 
 namespace msghublib {
-
-    namespace detail { class msghub_impl; }
 
     class msghub
     {
@@ -38,6 +34,7 @@ namespace msghublib {
         void stop();
         
       private:
-        std::shared_ptr<detail::msghub_impl> pimpl;
+        class impl;
+        std::shared_ptr<impl> pimpl;
     };
 }
