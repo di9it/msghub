@@ -15,4 +15,4 @@ namespace msghublib {
             virtual void deliver(hubmessage const& msg) = 0;
         };
     }
-}
+}  // namespace msghublib

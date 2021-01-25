@@ -29,7 +29,7 @@ public:
 
 private:
     using error_code = boost::system::error_code;
-    auto bind(void (hubconnection::*)(error_code));
+    auto bind(void (hubconnection::* /*handler*/)(error_code));
 
 	void handle_read_header(error_code error);
 	void handle_read_body(error_code error);
@@ -37,7 +37,6 @@ private:
 	void handle_write(error_code error);
 	void do_close(bool forced);
 
-private:
 	tcp::socket        socket_;
 	ihub&              courier_;
 	hubmessage         inmsg_;
@@ -45,4 +44,5 @@ private:
 	boost::atomic_bool is_closing;
 };
 
-} }
+}  // namespace detail
+}  // namespace msghublib

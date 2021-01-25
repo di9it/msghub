@@ -15,7 +15,7 @@ namespace msghublib {
         headers_.msgaction = action_;
         headers_.magic     = cookie;
 
-        auto out = payload_.data();
+        auto *out = payload_.data();
         out = std::copy_n(topic.data(), topic.size(), out);
         out = std::copy_n(msg.data(),   msg.size(),   out);
     }
@@ -41,4 +41,4 @@ namespace msghublib {
             .substr(headers_.topiclen, headers_.bodylen);
     }
 
-}
+}  // namespace msghublib

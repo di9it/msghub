@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio/buffer.hpp>
 #include <functional>
 #include <string_view>
 
@@ -12,18 +13,20 @@ namespace msghublib {
 class hubmessage
 {
   public:
+    // the following affect on-the-wire compatiblity
 	enum action : char { subscribe, unsubscribe, publish };
 	enum { version = 0x1 };
 	enum { cookie = 0xF00D ^ (version << 8) };
 	enum { messagesize = 0x2000 };
+    // the following does NOT affect on-the-wire compatiblity
+    enum { preallocated = 196 };
 
     hubmessage(action a={}, std::string_view topic={}, span<char const> msg = {});
 
-	bool             verify()     const;
-
-	action           get_action() const;
-	std::string_view topic()      const;
-	span<char const> body()       const;
+	[[nodiscard]] bool             verify()     const;
+	[[nodiscard]] action           get_action() const;
+	[[nodiscard]] std::string_view topic()      const;
+	[[nodiscard]] span<char const> body()       const;
 
   private:
 	#pragma pack(push, 1)
@@ -36,7 +39,7 @@ class hubmessage
 	#pragma pack(pop)
 
     headers_t headers_;
-    boost::container::small_vector<char, 242> payload_;
+    boost::container::small_vector<char, preallocated> payload_;
 
   public:
     // input buffer views
@@ -50,14 +53,14 @@ class hubmessage
     }
 
     // output buffer views
-    auto on_the_wire() const {
-        return std::vector { 
+    [[nodiscard]] auto on_the_wire() const {
+        return std::array<boost::asio::const_buffer, 2> { 
             boost::asio::buffer(&headers_, sizeof(headers_)),
             boost::asio::buffer(payload_.data(), payload_.size())
         };
     }
 };
 
-typedef std::deque<hubmessage> hubmessage_queue;
+using hubmessage_queue = std::deque<hubmessage>;
 
-}
+}  // namespace msghublib

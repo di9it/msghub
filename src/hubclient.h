@@ -27,16 +27,17 @@ class hubclient : public std::enable_shared_from_this<hubclient>
 	void write(const hubmessage& msg);
   private:
     using error_code = boost::system::error_code;
-	void handle_read_header(error_code);
-	void handle_read_body(error_code);
-	void handle_write(error_code);
+	void handle_read_header(error_code /*error*/);
+	void handle_read_body(error_code /*error*/);
+	void handle_write(error_code /*error*/);
 
-    auto bind(void (hubclient::*)(error_code));
-  private:
+    auto bind(void (hubclient::* /*handler*/)(error_code));
+  
 	tcp::socket			socket_;
 	ihub&				distributor_;
 	hubmessage			inmsg_;
 	hubmessage_queue	outmsg_queue_;
 };
 
-} }
+}  // namespace detail
+}  // namespace msghublib

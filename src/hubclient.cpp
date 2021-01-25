@@ -1,6 +1,6 @@
 #include "hubclient.h"
 
-namespace msghublib { namespace detail {
+namespace msghublib::detail {
     using boost::asio::ip::tcp;
 
     auto hubclient::bind(void (hubclient::*handler)(error_code)) {
@@ -29,7 +29,7 @@ namespace msghublib { namespace detail {
 
     void hubclient::write(const hubmessage& msg)
     {
-        post(socket_.get_executor(), [this, msg, self=shared_from_this()]{
+        post(socket_.get_executor(), [this, msg, self=shared_from_this()] () mutable {
             bool write_in_progress = !outmsg_queue_.empty();
             outmsg_queue_.push_back(std::move(msg));
             if (!write_in_progress)
@@ -48,7 +48,7 @@ namespace msghublib { namespace detail {
             async_read(socket_, inmsg_.payload_area(), bind(&hubclient::handle_read_body));
         }
 
-        // TODO handle invalid headers (connection reset?)
+        // TODO(sehe): handle invalid headers (connection reset?)
     }
 
     void hubclient::handle_read_body(error_code error)
@@ -59,7 +59,7 @@ namespace msghublib { namespace detail {
             // Get next
             async_read(socket_, inmsg_.header_buf(), bind(&hubclient::handle_read_header));
         }
-        // TODO handle IO failure
+        // TODO(sehe): handle IO failure
     }
 
     void hubclient::handle_write(error_code error)
@@ -68,7 +68,8 @@ namespace msghublib { namespace detail {
             outmsg_queue_.pop_front();
 
             if (!outmsg_queue_.empty()) {
-                // Write next from queue // TODO remove duplication
+                // Write next from queue
+                // TODO(sehe) remove duplication
                 async_write(socket_,
                     outmsg_queue_.front().on_the_wire(),
                     bind(&hubclient::handle_write));
@@ -77,4 +78,4 @@ namespace msghublib { namespace detail {
         // error TODO handling
     }
 
-} }
+}  // namespace msghublib::detail

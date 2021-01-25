@@ -1,6 +1,6 @@
 #include "hubconnection.h"
 
-namespace msghublib { namespace detail {
+namespace msghublib::detail {
     using boost::asio::ip::tcp;
 
     auto hubconnection::bind(void (hubconnection::*handler)(error_code)) {
@@ -42,7 +42,7 @@ namespace msghublib { namespace detail {
             else
             {
 #pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
-                post(socket_.get_executor(), [=, self=shared_from_this()]
+                post(socket_.get_executor(), [=, self=shared_from_this()] () mutable
                     { do_write(std::move(msg)); });
             }
             return true;
@@ -118,7 +118,7 @@ namespace msghublib { namespace detail {
     {
         is_closing = true; // atomic
 
-        // TODO: Unsubscribe?
+        // TODO(sehe): Unsubscribe?
 
         if (forced || outmsg_queue_.empty()) {
             if (socket_.is_open()) {
@@ -128,4 +128,4 @@ namespace msghublib { namespace detail {
         }
     }
 
-} }
+} // namespace msghublib::detail

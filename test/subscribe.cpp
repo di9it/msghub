@@ -33,7 +33,7 @@ namespace {
         BOOST_TEST(expected == message, boost::test_tools::per_element());
         newmessage.notify_one();
     }
-}
+}  // namespace
 
 BOOST_AUTO_TEST_CASE(test_subscribe)
 {
