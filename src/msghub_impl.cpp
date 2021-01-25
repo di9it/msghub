@@ -1,10 +1,12 @@
 #include "msghub_impl.h"
 
+#include <atomic>
 #include "ihub.h"
 #include "hubconnection.h"
 #include "hubclient.h"
 #include "hubmessage.h"
 
+#include <mutex>
 #include <span.h>
 #include <memory>
 #include <functional>
@@ -17,19 +19,34 @@ namespace msghublib { namespace detail {
     using boost::asio::ip::tcp;
 
     msghub_impl::msghub_impl(boost::asio::any_io_executor executor)
-        : acceptor_(make_strand(executor))
-        , work_(make_work_guard(executor))
+        : executor_(executor)
+        , acceptor_(make_strand(executor))
     {}
 
     void msghub_impl::stop()
     {
-        if (publisher_)
-            publisher_->close(false);
+        {
+            std::shared_ptr<hubconnection> rhub;
+            if (auto p = std::atomic_exchange(&remote_hub_, rhub))
+                p->close(false);
+        }
 
-        publisher_.reset();
+        if (!weak_from_this().expired()) {
+            post(acceptor_.get_executor(), [this, self = shared_from_this()] {
+                if (acceptor_.is_open())
+                    acceptor_.cancel();
+            });
+        } else {
+            if (acceptor_.is_open())
+                acceptor_.cancel();
+        }
 
-        if (acceptor_.is_open()) 
-            acceptor_.cancel();
+        if (0) {
+            std::lock_guard lk(mutex_);
+            for (auto& [_, client] : remote_subs_)
+                if (auto alive = client.lock())
+                    alive->stop();
+        }
 
         work_.reset();
     }
@@ -39,16 +56,16 @@ namespace msghublib { namespace detail {
         stop();
     }
 
-
     bool msghub_impl::connect(const std::string& hostip, uint16_t port)
     {
-        auto p = std::make_shared<hubconnection>(acceptor_.get_executor(), *this);
+        auto p = std::make_shared<hubconnection>(executor_, *this);
 
         if (p->init(hostip, port)) {
-            publisher_ = p;
+            atomic_store(&remote_hub_, p);
+            return true;
         }
 
-        return publisher_.get();
+        return false;
     }
 
     bool msghub_impl::create(uint16_t port)
@@ -61,70 +78,96 @@ namespace msghublib { namespace detail {
 
             accept_next();
 
-            auto p = std::make_shared<hubconnection>(
-                    acceptor_.get_executor(),
-                    *this);
+            auto p = std::make_shared<hubconnection>(executor_, *this);
 
-            if (p->init("localhost", port))
-                publisher_ = p;
-
-            return publisher_.get();
-        } catch(boost::system::system_error const&) {
-            return false;
-        }
+            if (p->init("localhost", port)) {
+                atomic_store(&remote_hub_, p);
+                return true;
+            }
+        } catch(boost::system::system_error const&) { }
+        return false;
     }
 
     bool msghub_impl::publish(std::string_view topic, span<char const> message)
     {
-        if (publisher_) {
-            return publisher_->write({hubmessage::action::publish, topic, message});
+        if (auto p = atomic_load(&remote_hub_)) {
+            return p->write({ hubmessage::action::publish, topic, message });
         }
         return false;
     }
 
+    msghub::onmessage const& msghub_impl::lookup_handler(std::string_view topic) const {
+        static const msghub::onmessage no_handler = [](auto...) {};
+
+        std::lock_guard lk(mutex_);
+        auto it = local_subs_.find(std::string(topic));
+        return (it == local_subs_.end())
+            ? no_handler
+            : it->second;
+    }
+
     bool msghub_impl::unsubscribe(const std::string& topic)
     {
-        if (publisher_ && messagemap_.find(topic) != messagemap_.end()) {
-            return publisher_->write({hubmessage::action::unsubscribe, topic}, true);
+        std::unique_lock lk(mutex_);
+        if (auto it = local_subs_.find(topic); it != local_subs_.end()) {
+            /*it =*/ local_subs_.erase(it);
+            lk.unlock();
+
+            if (auto p = atomic_load(&remote_hub_)) {
+                return p->write({hubmessage::action::unsubscribe, topic}, true);
+            }
         }
         return false;
     }
 
     bool msghub_impl::subscribe(const std::string& topic, msghub::onmessage handler)
     {
-        if (auto [it,ok] = messagemap_.emplace(topic, handler); !ok) {
+        std::unique_lock lk(mutex_);
+        if (auto [it,ins] = local_subs_.emplace(topic, handler); ins) {
+            lk.unlock();
+            if (auto p = atomic_load(&remote_hub_)) {
+                return p->write({hubmessage::action::subscribe, topic}, true);
+                // TODO: wait feedback from server here?
+            }
+        } else {
+            // just update the handler
             it->second = handler; // overwrite
+            return true;
         }
 
-        if (publisher_) {
-            return publisher_->write({hubmessage::action::subscribe, topic}, true);
-        }
-
-        // TODO: wait feedback from server here?
         return false;
     }
 
     void msghub_impl::distribute(std::shared_ptr<hubclient> const& subscriber, hubmessage const& msg)
     {
-        //post(acceptor_.get_executor(), do
         std::string topic(msg.topic());
-        auto range = client_subs_.equal_range(topic);
+        std::unique_lock lk(mutex_);
+        auto range = remote_subs_.equal_range(topic);
 
         switch (msg.get_action())
         {
         case hubmessage::action::publish:
-            for (auto it = range.first; it != range.second; ++it)
-                it->second->write(msg);
+            for (auto it = range.first; it != range.second;)
+            {
+                if (auto alive = it->second.lock()) {
+                    alive->write(msg);
+                    ++it;
+                }
+                else it = remote_subs_.erase(it);
+            }
             break;
 
         case hubmessage::action::subscribe:
-            client_subs_.emplace(topic, subscriber);
+#if __cpp_lib_erase_if // allows us to write that in one go:
+            std::erase_if(remote_subs_, [](auto& p) { return p.second.expired(); });
+#endif
+            remote_subs_.emplace(topic, subscriber);
             break;
 
         case hubmessage::action::unsubscribe:
             for (auto it = range.first; it != range.second;) {
-                if (it->second == subscriber)
-                    it = client_subs_.erase(it);
+                if (auto alive = it->second.lock(); !alive || alive == subscriber)
+                    it = remote_subs_.erase(it);
                 else ++it;
             }
             break;
@@ -136,11 +179,7 @@ namespace msghublib { namespace detail {
 
     void msghub_impl::deliver(hubmessage const& msg)
     { 
-        if (auto it = messagemap_.find(std::string(msg.topic()));
-                it != messagemap_.end())
-        {
-            it->second(msg.topic(), msg.body());
-        }
+        lookup_handler(msg.topic())(msg.topic(), msg.body());
     }
 
     void msghub_impl::accept_next()

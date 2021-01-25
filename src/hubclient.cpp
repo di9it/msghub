@@ -20,6 +20,13 @@ namespace msghublib { namespace detail {
         async_read(socket_, inmsg_.header_buf(), bind(&hubclient::handle_read_header));
     }
 
+    void hubclient::stop()
+    {
+        post(socket_.get_executor(), [this, self=shared_from_this()]{
+            socket_.cancel();
+        });
+    }
+
     void hubclient::write(const hubmessage& msg)
     {
         post(socket_.get_executor(), [this, msg, self=shared_from_this()]{

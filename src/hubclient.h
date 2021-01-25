@@ -23,6 +23,7 @@ class hubclient : public std::enable_shared_from_this<hubclient>
 
 	tcp::socket& socket();
 	void start();
+	void stop();
 	void write(const hubmessage& msg);
   private:
     using error_code = boost::system::error_code;
