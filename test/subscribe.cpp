@@ -1,5 +1,7 @@
 #include "msghub.h"
 
+#include <boost/test/tools/old/interface.hpp>
+#include <hub_error.h>
 #include <mutex>
 #include <condition_variable> 
 
@@ -40,10 +42,9 @@ BOOST_AUTO_TEST_CASE(test_subscribe)
 	boost::asio::thread_pool io(1);
 
     msghublib::msghub hub(io.get_executor());
-    BOOST_CHECK(hub.create(0xBEE));
-
-    BOOST_CHECK(hub.subscribe("test_topic", test_create_on_message));
-    BOOST_CHECK(hub.publish("test_topic", "$testmessage$"));
+    BOOST_CHECK_NO_THROW(hub.create(0xBEE));
+    BOOST_CHECK_NO_THROW(hub.subscribe("test_topic", test_create_on_message));
+    BOOST_CHECK_NO_THROW(hub.publish("test_topic", "$testmessage$"));
 
     {
         std::unique_lock<std::mutex> lock(mx);

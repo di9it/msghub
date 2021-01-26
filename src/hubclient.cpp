@@ -27,7 +27,7 @@ namespace msghublib::detail {
         });
     }
 
-    void hubclient::write(const hubmessage& msg)
+    void hubclient::send(const hubmessage& msg)
     {
         post(socket_.get_executor(), [this, msg, self=shared_from_this()] () mutable {
             bool write_in_progress = !outmsg_queue_.empty();

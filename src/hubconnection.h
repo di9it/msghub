@@ -2,7 +2,9 @@
 
 #include "ihub.h"
 #include "hubmessage.h"
+#include "hub_error.h"
 
+#include <boost/system/detail/error_code.hpp>
 #include <string>
 #include <memory>
 #include <functional>
@@ -23,17 +25,17 @@ public:
         , is_closing(false)
     {}
 
-	bool init(const std::string& host, uint16_t port);
-	bool write(const hubmessage& msg, bool wait = false);
+	void init(const std::string& host, uint16_t port, error_code& ec);
+	void async_send(const hubmessage& msg);
+	void send(const hubmessage& msg, error_code& ec);
 	void close(bool forced);
 
 private:
-    using error_code = boost::system::error_code;
     auto bind(void (hubconnection::* /*handler*/)(error_code));
 
 	void handle_read_header(error_code error);
 	void handle_read_body(error_code error);
-	void do_write(hubmessage msg);
+	void do_send(hubmessage msg);
 	void handle_write(error_code error);
 	void do_close(bool forced);
 
@@ -41,7 +43,7 @@ private:
 	ihub&              courier_;
 	hubmessage         inmsg_;
 	hubmessage_queue   outmsg_queue_;
-	boost::atomic_bool is_closing;
+	std::atomic_bool   is_closing;
 };
 
 }  // namespace detail

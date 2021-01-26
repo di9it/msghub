@@ -1,5 +1,7 @@
 #include "msghub.h"
 
+#include <boost/system/detail/error_code.hpp>
+#include <hub_error.h>
 #include <utility>
 
 #include "hubclient.h"
@@ -30,7 +32,7 @@ namespace msghublib {
         std::multimap<std::string, std::weak_ptr<hubclient>> remote_subs_;
 
       public:
-        explicit impl(boost::asio::any_io_executor const& executor)
+        explicit impl(any_io_executor const& executor)
             : executor_(executor)
             , acceptor_(make_strand(executor))
         {}
@@ -59,73 +61,76 @@ namespace msghublib {
 
         ~impl() { stop(); }
 
-        bool connect(const std::string& hostip, uint16_t port) {
+        void connect(const std::string& hostip, uint16_t port, error_code& ec) {
+            ec = {};
             auto p = std::make_shared<hubconnection>(executor_, *this);
 
-            if (p->init(hostip, port)) {
+            if (p->init(hostip, port, ec); !ec) {
                 atomic_store(&remote_hub_, p);
-                return true;
             }
-
-            return false;
         }
 
-        bool create(uint16_t port) {
+        void create(uint16_t port, error_code& ec) {
+            ec = {};
             try {
-                acceptor_.open(tcp::v4());
-                acceptor_.set_option(tcp::acceptor::reuse_address(true));
-                acceptor_.bind({ {}, port });
-                acceptor_.listen();
+                acceptor_.open(tcp::v4(), ec);
+                if (!ec) acceptor_.set_option(tcp::acceptor::reuse_address(true), ec);
+                if (!ec) acceptor_.bind({ {}, port }, ec);
+                if (!ec) acceptor_.listen(acceptor_.max_listen_connections, ec);
 
-                accept_next();
+                if (!ec) {
+                    accept_next();
 
-                auto p = std::make_shared<hubconnection>(executor_, *this);
+                    auto p = std::make_shared<hubconnection>(executor_, *this);
 
-                if (p->init("localhost", port)) {
-                    atomic_store(&remote_hub_, p);
-                    return true;
+                    if (p->init("localhost", port, ec); !ec) {
+                        atomic_store(&remote_hub_, p);
+                    }
                 }
-            } catch (boost::system::system_error const&) {
+            } catch (system_error const& se) {
+                ec = se.code();
             }
-            return false;
         }
 
-        bool publish(std::string_view topic, span<char const> message) {
+        void publish(std::string_view topic, span<char const> message, error_code& ec) {
+            ec = {};
             if (auto p = atomic_load(&remote_hub_)) {
-                return p->write({ hubmessage::action::publish, topic, message });
+                p->async_send({ hubmessage::action::publish, topic, message });
+            } else {
+                ec = hub_errc::hub_not_connected;
             }
-            return false;
         }
 
-        bool unsubscribe(const std::string& topic) {
+        void unsubscribe(const std::string& topic, error_code& ec) {
+            ec = {};
             std::unique_lock lk(mutex_);
             if (auto it = local_subs_.find(topic); it != local_subs_.end()) {
                 /*it =*/local_subs_.erase(it);
                 lk.unlock();
 
                 if (auto p = atomic_load(&remote_hub_)) {
-                    return p->write({ hubmessage::action::unsubscribe, topic },
-                                    true);
+                    p->send({ hubmessage::action::unsubscribe, topic }, ec);
+                } else {
+                    ec = hub_errc::hub_not_connected;
                 }
             }
-            return false;
         }
 
-        bool subscribe(const std::string& topic, const msghub::onmessage& handler) {
+        void subscribe(const std::string& topic, const msghub::onmessage& handler, error_code& ec) {
+            ec = {};
             std::unique_lock lk(mutex_);
             if (auto [it, ins] = local_subs_.emplace(topic, handler); ins) {
                 lk.unlock();
                 if (auto p = atomic_load(&remote_hub_)) {
-                    return p->write({ hubmessage::action::subscribe, topic }, true);
+                    p->send({ hubmessage::action::subscribe, topic }, ec);
                     // TODO(sehe): wait feedback from server here?
+                } else {
+                    ec = hub_errc::hub_not_connected;
                 }
             } else {
                 // just update the handler
                 it->second = handler; // overwrite
-                return true;
             }
-
-            return false;
         }
 
       private:
@@ -137,8 +142,7 @@ namespace msghublib {
             return (it == local_subs_.end()) ? no_handler : it->second;
         }
 
-        void distribute(std::shared_ptr<hubclient> const& subscriber,
-                        hubmessage const& msg) override {
+        void distribute(std::shared_ptr<hubclient> const& subscriber, hubmessage const& msg) override {
             std::string topic(msg.topic());
             std::unique_lock lk(mutex_);
             auto range = remote_subs_.equal_range(topic);
@@ -147,7 +151,7 @@ namespace msghublib {
             case hubmessage::action::publish:
                 for (auto it = range.first; it != range.second;) {
                     if (auto alive = it->second.lock()) {
-                        alive->write(msg);
+                        alive->send(msg);
                         ++it;
                     } else {
                         it = remote_subs_.erase(it);
@@ -157,8 +161,7 @@ namespace msghublib {
 
             case hubmessage::action::subscribe:
 #if __cpp_lib_erase_if // allows us to write that in one go:
-                std::erase_if(remote_subs_,
-                              [](auto& p) { return p.second.expired(); });
+                std::erase_if(remote_subs_, [](auto& p) { return p.second.expired(); });
 #endif
                 remote_subs_.emplace(topic, subscriber);
                 break;
@@ -190,19 +193,17 @@ namespace msghublib {
             // Schedule next accept
             acceptor_.async_accept(
                 subscriber->socket(),
-                [=, this, self = shared_from_this()](boost::system::error_code ec) {
+                [=, this, self = shared_from_this()](error_code ec) {
                     handle_accept(subscriber, ec);
                 });
         }
 
-        void handle_accept(std::shared_ptr<hubclient> const& client,
-                           const boost::system::error_code& error) {
+        void handle_accept(std::shared_ptr<hubclient> const& client, error_code error) {
             if (!error) {
                 client->start();
                 accept_next();
             } else {
                 //// TODO: Handle IO error - on thread exit
-                // int e = error.value();
             }
         }
     };
@@ -216,11 +217,49 @@ namespace msghublib {
 
     msghub::~msghub() = default;
 
-    void msghub::stop()                                                    { return pimpl->stop();                    } 
-    bool msghub::connect(const std::string& hostip, uint16_t port)         { return pimpl->connect(hostip, port);     } 
-    bool msghub::create(uint16_t port)                                     { return pimpl->create(port);              } 
-    bool msghub::unsubscribe(const std::string& topic)                     { return pimpl->unsubscribe(topic);        } 
-    bool msghub::subscribe(const std::string& topic, onmessage handler)    { return pimpl->subscribe(topic, std::move(handler)); } 
-    bool msghub::publish(std::string_view topic, span<char const> message) { return pimpl->publish(topic, message);   } 
+    // pimpl relays
+    void msghub::stop()
+        { return pimpl->stop();                            } 
+    void msghub::connect(const std::string& hostip, uint16_t port, error_code& ec)
+        { pimpl->connect(hostip, port, ec);                } 
+    void msghub::create(uint16_t port, error_code& ec)
+        { pimpl->create(port, ec);                         } 
+    void msghub::unsubscribe(const std::string& topic, error_code& ec)
+        { pimpl->unsubscribe(topic, ec);                   } 
+    void msghub::subscribe(const std::string& topic, onmessage handler, error_code& ec)
+        { pimpl->subscribe(topic, std::move(handler), ec); } 
+    void msghub::publish(std::string_view topic, span<char const> message, error_code& ec)
+        { pimpl->publish(topic, message, ec);              } 
+
+    // convenience throwing wrappers
+    void msghub::connect(const std::string& hostip, uint16_t port) {
+        error_code ec;
+        connect(hostip, port, ec);
+        if (ec) throw system_error(ec);
+    }
+
+    void msghub::create(uint16_t port) {
+        error_code ec;
+        create(port, ec);
+        if (ec) throw system_error(ec);
+    }
+
+    void msghub::unsubscribe(const std::string& topic) {
+        error_code ec;
+        unsubscribe(topic, ec);
+        if (ec) throw system_error(ec);
+    }
+
+    void msghub::subscribe(const std::string& topic, onmessage handler) {
+        error_code ec;
+        subscribe(topic, handler, ec);
+        if (ec) throw system_error(ec);
+    }
+
+    void msghub::publish(std::string_view topic, span<char const> message) {
+        error_code ec;
+        publish(topic, message, ec);
+        if (ec) throw system_error(ec);
+    }
 
 } // namespace msghublib

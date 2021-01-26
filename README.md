@@ -32,15 +32,13 @@ Examples
         boost::asio::io_context io;
         // Create hub to listen on 0xbee port
         mh::msghub hub(io.get_executor());
-        if (!hub.create(0xbee)) {
-            std::cerr << "Couldn't create hub\n";
-        } else {
-            // Subscribe on "any topic"
-            /* bool ok = */hub.subscribe("any topic", on_message);
+        hub.create(0xbee);
 
-            // Current or any another client
-            /* bool ok = */hub.publish("any topic", "new message");
-        }
+        // Subscribe on "any topic"
+        hub.subscribe("any topic", on_message);
+
+        // Current or any another client
+        hub.publish("any topic", "new message");
 
         io.run(); // keep server active, if created
     }
@@ -54,9 +52,8 @@ Examples
     {
         boost::asio::io_context io;
         mh::msghub hub(io.get_executor());
-        if (hub.connect("localhost", 0xbee)) {
-            /*bool ok = */hub.publish("any topic", "new message");
-        }
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
 
         hub.stop();
         io.run();
@@ -72,9 +69,8 @@ Examples
     {
         boost::asio::thread_pool io(5); // count optional
         mh::msghub hub(io.get_executor());
-        if (hub.connect("localhost", 0xbee)) {
-            /*bool ok = */hub.publish("any topic", "new message");
-        }
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
 
         hub.stop();
         io.join();
