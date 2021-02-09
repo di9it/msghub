@@ -1,6 +1,5 @@
 SET(MSGHUB_SRC
     msghub.cpp
-    msghub_impl.cpp
     hubclient.cpp
     hubconnection.cpp
     hubmessage.cpp
