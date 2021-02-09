@@ -5,14 +5,18 @@
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <boost/test/unit_test_suite.hpp>
 #include <boost/test/unit_test_monitor.hpp>
 #include <boost/test/test_tools.hpp>
 
-std::mutex mutant;
-std::condition_variable newmessage;
-bool goodmessage = false;
+BOOST_AUTO_TEST_SUITE(message_hub)
+
+static std::mutex mutant;
+static std::condition_variable newmessage;
+static bool goodmessage = false;
 
 using namespace boost::unit_test;
+
 void test_create_on_message(const std::string& topic, std::vector<char> const& message)
 {
 	std::unique_lock<std::mutex> lock(mutant);
@@ -32,7 +36,7 @@ bool publish_message(msghub& msghub)
 	return true;
 }
 
-void test_subscribe()
+BOOST_AUTO_TEST_CASE(test_subscribe)
 {
 	boost::asio::io_service io_service;
 	msghub msghub(io_service);
@@ -46,3 +50,5 @@ void test_subscribe()
 	io_service.stop();
 	//io_service1.stop();
 }
+
+BOOST_AUTO_TEST_SUITE_END()

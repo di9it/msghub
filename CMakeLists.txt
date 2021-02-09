@@ -12,11 +12,11 @@ FIND_PACKAGE(Threads REQUIRED)
 SET(Boost_USE_MULTITHREAD ON)
 SET(Boost_USE_STATIC_LIBS OFF)
 
-FIND_PACKAGE(Boost 1.70.0
+FIND_PACKAGE(Boost 1.65.0
     COMPONENTS system thread unit_test_framework test_exec_monitor
     REQUIRED)
 
-#LINK_LIBRARIES(${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY})
+LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
 # https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
