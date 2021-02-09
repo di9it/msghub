@@ -4,10 +4,10 @@
 #include <string>
 
 #include <boost/asio.hpp>
-#include <boost/test/test_tools.hpp>
+#include <boost/test/unit_test.hpp>
 
-void test_connect()
-{
+BOOST_AUTO_TEST_SUITE(message_hub)
+BOOST_AUTO_TEST_CASE(test_connect) {
 	{
 		boost::asio::io_service io_service;
 
@@ -18,3 +18,5 @@ void test_connect()
 		io_service.stop();
 	}
 }
+
+BOOST_AUTO_TEST_SUITE_END()

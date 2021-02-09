@@ -1,3 +1,4 @@
+ADD_DEFINITIONS(-DBOOST_TEST_DYN_LINK)
 ADD_EXECUTABLE(tester
     client_onserverfailure.cpp
     connect.cpp
