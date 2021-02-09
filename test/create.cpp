@@ -4,9 +4,11 @@
 #include <string>
 
 #include <boost/asio.hpp>
-#include <boost/test/test_tools.hpp>
+#include <boost/test/unit_test.hpp>
 
-void test_create()
+BOOST_AUTO_TEST_SUITE(message_hub)
+
+BOOST_AUTO_TEST_CASE(test_create)
 {
 	// Create 2 instances with same address and port, second shoul fail
 	{
@@ -29,3 +31,5 @@ void test_create()
 	}
 
 }
+
+BOOST_AUTO_TEST_SUITE_END()

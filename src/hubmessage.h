@@ -27,14 +27,14 @@ private:
 	#pragma pack(push, 1)
 	union packet
 	{
-		struct
+		struct headers_t
 		{
 			uint16_t	topiclen;
 			uint16_t	bodylen;
 			action		msgaction;
 			uint16_t	magic;
 			char		payload[1];
-		};
+		} headers;
 		char data[messagesize];
 	};
 	#pragma pack(pop)
@@ -61,6 +61,8 @@ public:
 	action get_action() const;
 	void set_action(action action);
 
+    packet::headers_t& headers();
+    packet::headers_t const& headers() const;
 	char* body();
 	size_t body_length() const;
 	void set_message(const std::string& subj);

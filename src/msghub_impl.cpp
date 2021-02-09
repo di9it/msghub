@@ -45,14 +45,15 @@ void msghub_impl::initpool(uint8_t threads)
 
 msghub_impl::msghub_impl(boost::asio::io_service& io_service)
 	: publisher_(new hubconnection(io_service, *this))
-	, acceptor_(io_service)
 	, io_service_(io_service)
+    , work_(boost::asio::io_service::work(io_service))
+	, acceptor_(io_service)
 	, initok_(false)
 {}
 
 msghub_impl::~msghub_impl()
 {
-	io_service_.stop();
+    join();
 }
 
 
@@ -68,18 +69,9 @@ bool msghub_impl::create(uint32_t port, uint8_t threads)
 	tcp::endpoint endpoint(tcp::v4(), port);
 	acceptor_ = tcp::acceptor(io_service_, endpoint);
 
-	//acceptor_.open(endpoint.protocol());
-	//acceptor_.set_option(tcp::acceptor::reuse_address(false));
-	//boost::system::error_code err;
-	//err = acceptor_.bind(endpoint, err);
-	//if (err)
-	//	return false;
-	//acceptor_.listen();
+    acceptor_.set_option(tcp::acceptor::reuse_address(true));
+	acceptor_.listen();
 
-	//endpoint
-	//boost::asio::socket_base::reuse_address option(false);
-	//acceptor_.set_option(option);
-	//acceptor_.
 	accept_next();
 
 	initpool(threads);
@@ -89,9 +81,17 @@ bool msghub_impl::create(uint32_t port, uint8_t threads)
 
 void msghub_impl::join()
 {
+    if (publisher_)
+        publisher_->close(false);
+    publisher_.reset();
+    if (acceptor_.is_open()) 
+        acceptor_.cancel();
+    work_.reset();
+
 	// Join to all service threads
 	for (auto it : threads_)
-		it->join();
+        if (it->joinable())
+            it->join();
 }
 
 bool msghub_impl::publish(const std::string& topic, const std::vector<char>& message)
@@ -200,7 +200,7 @@ void msghub_impl::distribute(boost::shared_ptr<hubclient> subscriber, hubmessage
 	}
 }
 
-void msghub_impl::deliver(boost::shared_ptr<hubconnection> publisher, hubmessage& msg)
+void msghub_impl::deliver(hubmessage& msg)
 {
 	std::string topic(msg.payload(), msg.topic_length());
 	messagemapit it = messagemap_.find(topic);
@@ -229,8 +229,8 @@ void msghub_impl::handle_accept(boost::shared_ptr<hubclient> client, const boost
 	}
 	else
 	{
-		// TODO: Handle IO error - on thread exit
-		int e = error.value();
+		//// TODO: Handle IO error - on thread exit
+		//int e = error.value();
 	}
 
 	accept_next();

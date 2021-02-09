@@ -1,0 +1,32 @@
+PROJECT(msghub)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+#enable_testing()
+
+SET(CMAKE_EXPORT_COMPILE_COMMANDS On)
+
+# Threads
+SET(THREADS_PREFER_PTHREAD_FLAG ON)
+FIND_PACKAGE(Threads REQUIRED)
+
+# Boost libraries
+SET(Boost_USE_MULTITHREAD ON)
+SET(Boost_USE_STATIC_LIBS OFF)
+
+FIND_PACKAGE(Boost 1.65.0
+    COMPONENTS system thread unit_test_framework test_exec_monitor
+    REQUIRED)
+
+LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
+# https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+SET(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS}         -Wall -Wextra -pedantic ")
+SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O3 -march=native")
+SET(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -fsanitize=address,undefined")
+SET(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   -ggdb -fno-omit-frame-pointer -O0")
+
+ADD_SUBDIRECTORY(src)
+ADD_SUBDIRECTORY(test)
+ADD_SUBDIRECTORY(examples)
