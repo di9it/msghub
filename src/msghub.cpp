@@ -1,7 +1,5 @@
 #include "msghub.h"
 
-#include <boost/system/detail/error_code.hpp>
-#include <hub_error.h>
 #include <utility>
 
 #include "hubclient.h"

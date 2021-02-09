@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/system/detail/error_code.hpp>
+#include <boost/system/error_code.hpp>
 #include <memory>
 #include <boost/asio.hpp>
 #include <string>

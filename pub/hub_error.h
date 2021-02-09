@@ -1,8 +1,6 @@
 #pragma once
 #include <boost/system/error_code.hpp>
-#include <boost/system/is_error_code_enum.hpp>
 #include <boost/system/system_error.hpp>
-#include <system_error>
 #include <type_traits>
 
 namespace msghublib {

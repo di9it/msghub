@@ -1,0 +1,16 @@
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN \
+        apt update; \
+        apt -qqyy install build-essential git cmake libboost-all-dev
+
+# Calls for a random number to break the cahing of the git clone
+# (https://stackoverflow.com/questions/35134713/disable-cache-for-specific-run-commands/58801213#58801213)
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" /tmp/skipcache
+RUN git clone https://github.com/sehe/msghub --depth 1 -b std-over-boost
+
+WORKDIR /msghub
+
+RUN cmake . && make
+
+CMD ./test/tester -l all

@@ -4,7 +4,7 @@
 #include "hubmessage.h"
 #include "hub_error.h"
 
-#include <boost/system/detail/error_code.hpp>
+#include <boost/system/error_code.hpp>
 #include <string>
 #include <memory>
 #include <functional>
