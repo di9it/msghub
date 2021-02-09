@@ -5,20 +5,25 @@
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <boost/test/unit_test_suite.hpp>
 #include <boost/test/unit_test_monitor.hpp>
 #include <boost/test/test_tools.hpp>
 
-std::mutex mutant;
-std::condition_variable newmessage;
-bool goodmessage = false;
+BOOST_AUTO_TEST_SUITE(message_hub)
+
+static std::mutex mutant;
+static std::condition_variable newmessage;
+static bool goodmessage = false;
 
 using namespace boost::unit_test;
-void test_create_on_message(const std::string& topic, std::vector<char>& message)
+
+void test_create_on_message(const std::string& topic, std::vector<char> const& message)
 {
 	std::unique_lock<std::mutex> lock(mutant);
-	std::string expected("$testmessage$");
-	goodmessage = std::equal(expected.begin(), expected.end(), message.begin());
-	BOOST_CHECK(goodmessage);
+	std::vector<char> expected{'$','t','e','s','t','m','e','s','s','a','g','e','$'};
+    goodmessage = (expected == message);
+	BOOST_CHECK_EQUAL("test_topic", topic);
+    BOOST_TEST(expected == message, boost::test_tools::per_element());
 	newmessage.notify_one();
 }
 
@@ -31,7 +36,7 @@ bool publish_message(msghub& msghub)
 	return true;
 }
 
-void test_subscribe()
+BOOST_AUTO_TEST_CASE(test_subscribe)
 {
 	boost::asio::io_service io_service;
 	msghub msghub(io_service);
@@ -45,3 +50,5 @@ void test_subscribe()
 	io_service.stop();
 	//io_service1.stop();
 }
+
+BOOST_AUTO_TEST_SUITE_END()

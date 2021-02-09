@@ -18,6 +18,7 @@
 //#include <boost/thread/thread.hpp>
 //#include <boost/lexical_cast.hpp>
 //#include <boost/thread/mutex.hpp>
+#include <iostream>
 
 using boost::asio::ip::tcp;
 
@@ -25,6 +26,7 @@ hubconnection::hubconnection(boost::asio::io_service& io_service, hub& courier)
 	: io_service_(io_service)
 	, socket_(io_service)
 	, courier_(courier)
+    , is_closing(false)
 {}
 
 bool hubconnection::init(const std::string& host, uint16_t port)
@@ -64,6 +66,7 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 		{
 			io_service_.post(boost::bind(&hubconnection::do_write, shared_from_this(), msg));
 		}
+        return true;
 	}
 	catch (std::exception&)
 	{
@@ -72,9 +75,9 @@ bool hubconnection::write(const hubmessage& msg, bool wait)
 
 }
 
-void hubconnection::close()
+void hubconnection::close(bool forced)
 {
-	io_service_.post(boost::bind(&hubconnection::do_close, shared_from_this()));
+	io_service_.post(boost::bind(&hubconnection::do_close, shared_from_this(), forced));
 }
 
 void hubconnection::handle_read_header(const boost::system::error_code& error)
@@ -89,7 +92,7 @@ void hubconnection::handle_read_header(const boost::system::error_code& error)
 	}
 	else
 	{
-		do_close();
+		do_close(true);
 	}
 }
 
@@ -97,7 +100,7 @@ void hubconnection::handle_read_body(const boost::system::error_code& error)
 {
 	if (!error)
 	{
-		courier_.deliver(shared_from_this(), inmsg_);
+		courier_.deliver(inmsg_);
 
 		boost::asio::async_read(socket_,
 			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
@@ -106,15 +109,18 @@ void hubconnection::handle_read_body(const boost::system::error_code& error)
 	}
 	else
 	{
-		do_close();
+		do_close(true);
 	}
 }
 
 void hubconnection::do_write(hubmessage msg)
 {
-	boost::mutex::scoped_lock lock(write_msgs_lock_);
-	bool iswriting = !outmsg_queue_.empty();
-	outmsg_queue_.push_back(msg);
+    bool iswriting = true;
+    {
+        boost::mutex::scoped_lock lock(write_msgs_lock_);
+        iswriting = !outmsg_queue_.empty();
+        outmsg_queue_.push_back(msg);
+    }
 	if (!iswriting)
 	{
 		boost::asio::async_write(socket_,
@@ -129,25 +135,43 @@ void hubconnection::handle_write(const boost::system::error_code& error)
 {
 	if (!error)
 	{
-		boost::mutex::scoped_lock lock(write_msgs_lock_);
-		outmsg_queue_.pop_front();
-		if (!outmsg_queue_.empty())
+        bool remaining_messages = false;
+        {
+            boost::mutex::scoped_lock lock(write_msgs_lock_);
+            outmsg_queue_.pop_front();
+            remaining_messages = !outmsg_queue_.empty();
+        }
+		if (remaining_messages)
 		{
 			boost::asio::async_write(socket_,
 				boost::asio::buffer(outmsg_queue_.front().data(),
 				outmsg_queue_.front().length()),
 				boost::bind(&hubconnection::handle_write, shared_from_this(),
 				boost::asio::placeholders::error));
-		}
+        } else if (is_closing) {
+            do_close(false);
+        }
 	}
 	else
 	{
-		do_close();
+		do_close(true);
 	}
 }
 
-void hubconnection::do_close()
+void hubconnection::do_close(bool forced)
 {
+    is_closing = true;
+
 	// TODO: Unsubscribe?
-	socket_.close();
+
+    bool immediate = forced;
+    if (!forced) {
+        boost::mutex::scoped_lock lock(write_msgs_lock_);
+        immediate |= outmsg_queue_.empty();
+    }
+    
+    if (immediate) {
+        if (socket_.is_open())
+            socket_.close();
+    }
 }

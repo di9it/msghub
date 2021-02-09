@@ -12,6 +12,7 @@
 #include <vector>
 #include <deque>
 
+#include <boost/atomic.hpp>
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -29,7 +30,7 @@ public:
 	hubconnection(boost::asio::io_service& io_service, hub& courier);
 	bool init(const std::string& host, uint16_t port);
 	bool write(const hubmessage& msg, bool wait = false);
-	void close();
+	void close(bool forced);
 
 private:
 
@@ -37,14 +38,15 @@ private:
 	void handle_read_body(const boost::system::error_code& error);
 	void do_write(hubmessage msg);
 	void handle_write(const boost::system::error_code& error);
-	void do_close();
+	void do_close(bool forced);
 
 private:
-	hub&						courier_;
 	boost::asio::io_service&	io_service_;
 	tcp::socket					socket_;
+	hub&						courier_;
 	hubmessage					inmsg_;
 	hubmessage_queue			outmsg_queue_;
+	boost::atomic_bool			is_closing;
 	boost::mutex				write_msgs_lock_;
 };
 
