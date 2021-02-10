@@ -13,8 +13,7 @@ SET(Boost_USE_MULTITHREAD ON)
 SET(Boost_USE_STATIC_LIBS OFF)
 
 FIND_PACKAGE(Boost 1.65.0
-    COMPONENTS system thread unit_test_framework test_exec_monitor
-    REQUIRED)
+    COMPONENTS system thread unit_test_framework REQUIRED)
 
 LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
 # https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html

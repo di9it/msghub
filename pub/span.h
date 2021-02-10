@@ -8,18 +8,27 @@
         using std::span;
     }
 #else
+    #include <string_view>
+    #include <string>
     namespace msghublib {
         namespace detail {
             template <typename T> struct span {
                 T* _data;
                 size_t _size;
 
-                constexpr span(T* data, size_t size) : _data(data), _size(size) {}
+                constexpr span(T* data = nullptr, size_t size = 0ull) : _data(data), _size(size) {}
 
+                template <typename C>
+                constexpr span(std::basic_string_view<C> const& sv)
+                        : span(sv.data(), sv.size()) {}
+                template <typename... C>
+                constexpr span(std::basic_string<C...> const& s)
+                        : span(s.data(), s.size()) {}
                 template <size_t N>
-                    constexpr span(T (&arr)[N]) : span(arr, N) {}
+                constexpr span(T (&arr)[N]) : span(arr, N) {}
                 template <size_t N>
-                    constexpr span(std::array<T, N>& arr) : span(arr.data(), arr.size()) {}
+                constexpr span(std::array<T, N>& arr)
+                        : span(arr.data(), arr.size()) {}
 
                 template <typename It>
                     constexpr span(It first, size_t n) : span(std::addressof(*first), n) {}
