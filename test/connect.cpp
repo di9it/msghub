@@ -4,17 +4,18 @@
 #include <string>
 
 #include <boost/asio.hpp>
-#include <boost/test/test_tools.hpp>
+#include <boost/test/unit_test.hpp>
+namespace mh = msghublib;
 
-void test_connect()
-{
-	{
-		boost::asio::io_service io_service;
+BOOST_AUTO_TEST_SUITE(message_hub)
+BOOST_AUTO_TEST_CASE(test_connect) {
+    boost::asio::io_context io;
 
-		msghub msghub1(io_service);
-		BOOST_CHECK(msghub1.create(0xBEE));
-		
-		BOOST_CHECK(msghub1.connect("localhost", 0xBEE));
-		io_service.stop();
-	}
+    mh::msghub hub(io.get_executor());
+
+    BOOST_CHECK_NO_THROW(hub.create(0xBEE));
+    BOOST_CHECK_NO_THROW(hub.connect("localhost", 0xBEE));
+    io.stop();
 }
+
+BOOST_AUTO_TEST_SUITE_END()

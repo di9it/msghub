@@ -16,35 +16,64 @@ Array may contain any serialized user data, but it's out of scope here.
 Examples
 --------
 
-I. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
-```c++
-	// Message handler
-	void on_message(const std::string& topic, std::vector<char>& message)
-	{
-	   // handle message
-	}
+ 1. Create hub, subscribe on "any topic" and publish "new message" into "any topic":
 
-	int main()
-	{
-		boost::asio::io_service io_service;
-		// Create hub to listen on 0xbee port
-		msghub msghub(io_service);
-		msghub.create(0xbee);
-		// Subscribe on "any topic"
-		msghub.subscribe("any topic", on_message);
-		// Current or any another client
-		msghub.publish("any topic", "new message");
-		io_service.run();
-	}
-```
-II. Connect to hub on "localhost" and publish "new message" into "any topic":
-```c++
-	int main()
-	{
-		boost::asio::io_service io_service;
-		msghub msghub(io_service);
-		msghub.connect("localhost", 0xbee);
-		msghub.publish("any topic", "new message");
-		io_service.run();
-	}
-```
+    ```c++
+    namespace mh = msghublib;
+
+    // Message handler
+    void on_message(std::string_view topic, mh::span<char const> message)
+    {
+        // handle message
+    }
+
+    int main()
+    {
+        boost::asio::io_context io;
+        // Create hub to listen on 0xbee port
+        mh::msghub hub(io.get_executor());
+        hub.create(0xbee);
+
+        // Subscribe on "any topic"
+        hub.subscribe("any topic", on_message);
+
+        // Current or any another client
+        hub.publish("any topic", "new message");
+
+        io.run(); // keep server active, if created
+    }
+    ```
+ 2. Connect to hub on "localhost" and publish "new message" into "any topic":
+
+    ```c++
+    namespace mh = msghublib;
+
+    int main()
+    {
+        boost::asio::io_context io;
+        mh::msghub hub(io.get_executor());
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
+
+        hub.stop();
+        io.run();
+    }
+    ```
+
+ 3. Using multiple threads
+
+    ```c++
+    namespace mh = msghublib;
+
+    int main()
+    {
+        boost::asio::thread_pool io(5); // count optional
+        mh::msghub hub(io.get_executor());
+        hub.connect("localhost", 0xbee);
+        hub.publish("any topic", "new message");
+
+        hub.stop();
+        io.join();
+    }
+    ```
+Note: `span<char const>` is `std::span<char const>` on c++20 capable compilers.

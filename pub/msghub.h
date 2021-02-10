@@ -1,42 +1,58 @@
-#ifndef _MSGHUB_MSGHUB_H_
-#define _MSGHUB_MSGHUB_H_
+#pragma once
 
-#include <string>
-#include <vector>
-#include <cstdint>
-
-#include <boost/shared_ptr.hpp>
+#include <boost/system/error_code.hpp>
+#include <memory>
 #include <boost/asio.hpp>
+#include <string>
+#include <string_view>
+#include "hub_error.h"
+#include "span.h"
 
-class msghub_impl;
-class msghub
-{
-public:
-    typedef std::function< void(const std::string& topic, std::vector<char>& message) > onmessage;
-    
-public:
-    msghub( boost::asio::io_service& s );
-    bool connect(const std::string& hostip, uint16_t port, uint8_t threads = 1);
-    bool create(uint16_t port, uint8_t threads = 1);
+namespace msghublib {
 
-    bool unsubscribe(const std::string& topic);
-    bool subscribe(const std::string& topic, onmessage handler);
-    bool publish(const std::string& topic, const std::vector<char>& message);
-	bool publish(const std::string& topic, const std::string& message);
+    class msghub
+    {
+      public:
+        typedef std::function< void(std::string_view topic, span<char const> message) > onmessage;
+        
+      public:
+        explicit msghub(boost::asio::any_io_executor);
+        ~msghub();
 
-	//template<typename T>
-	//publish(const std::string& topic, const T& buff)
-	//{
-	//	std::copy(buff.begin(), buff.end(), back_inserter(data));
-	//	type = msgtype;
-	//	length = sizeof(type) + sizeof(length) + data.size();
-	//}
+        //void connect(const std::string& hostip, uint16_t port);
+        void connect(const std::string& hostip, uint16_t port, error_code& ec);
+        void create(uint16_t port, error_code& ec);
 
+        void unsubscribe(const std::string& topic, error_code& ec);
+        void subscribe(const std::string& topic, onmessage handler, error_code& ec);
+        void publish(std::string_view topic, span<char const> message, error_code& ec);
 
-    void join();
-    
-private:
-    boost::shared_ptr<msghub_impl> pimpl;
-};
+        // Treat string literals specially, not including the terminating NUL
+        template <size_t N>
+        void publish(std::string_view topic, char const (&literal)[N], error_code& ec) {
+            static_assert(N>0);
+            publish(topic, span<char const>{literal, N-1}, ec);
+        }
 
-#endif
+        void stop();
+
+        // convenience throwing wrappers
+        void connect(const std::string& hostip, uint16_t port);
+        void create(uint16_t port);
+        void unsubscribe(const std::string& topic);
+        void subscribe(const std::string& topic, onmessage handler);
+        void publish(std::string_view topic, span<char const> message);
+
+        // Treat string literals specially, not including the terminating NUL
+        template <size_t N>
+        void publish(std::string_view topic, char const (&literal)[N]) {
+            error_code ec;
+            publish(topic, literal, ec);
+            if (ec) throw system_error(ec);
+        }
+        
+      private:
+        class impl;
+        std::shared_ptr<impl> pimpl;
+    };
+}

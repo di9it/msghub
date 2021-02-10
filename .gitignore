@@ -1,0 +1,6 @@
+*.cmake
+CMakeCache.txt
+test/tester
+src/libmsghub.a
+examples/server
+examples/client

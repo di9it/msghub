@@ -1,112 +1,44 @@
 #include "hubmessage.h"
-//#include "msghub_types.h"
-//
-//#include <cstdint>
-//#include <cstdio>
-//#include <cstdlib>
-//#include <cstring>
-//#include <deque>
-//#include <iterator>
-//
-//#include <memory>
-//#include <boost/iostreams/device/array.hpp>
-//#include <boost/iostreams/stream.hpp>
-//#include <boost/archive/binary_oarchive.hpp>
-//#include <boost/archive/binary_iarchive.hpp>
-//#include <boost/serialization/vector.hpp>
+#include <span.h>
+#include <string_view>
 
-hubmessage::hubmessage()
-{}
+namespace msghublib {
+    hubmessage::hubmessage(action action_, std::string_view topic, span<char const> msg)
+        : headers_ {}, payload_(topic.size() + msg.size())
+    {
+        if (topic.size() + msg.size() > (messagesize - sizeof(headers_))) {
+            throw std::length_error("messagesize");
+        }
 
-const char* hubmessage::data() const
-{
-	return data_.data;
-}
+        headers_.topiclen  = topic.length();
+        headers_.bodylen   = msg.size();
+        headers_.msgaction = action_;
+        headers_.magic     = cookie;
 
-char* hubmessage::data()
-{
-	return data_.data;
-}
+        auto *out = payload_.data();
+        out = std::copy_n(topic.data(), topic.size(), out);
+        out = std::copy_n(msg.data(),   msg.size(),   out);
+    }
 
-size_t hubmessage::header_length() const
-{
-	return offsetof(packet, payload);
-}
+    bool hubmessage::verify() const
+    {
+        return headers_.magic == cookie;
+    }
 
-size_t hubmessage::length() const
-{
-	return header_length() + payload_length();
-}
+    hubmessage::action hubmessage::get_action() const {
+        return headers_.msgaction;
+    }
 
-char* hubmessage::payload()
-{
-	return data_.payload;
-}
+    std::string_view hubmessage::topic() const {
+        return
+            std::string_view(payload_.data(), payload_.size())
+            .substr(0, headers_.topiclen);
+    }
 
-char* hubmessage::topic()
-{
-	return payload();
-}
+    span<char const> hubmessage::body() const {
+        return
+            std::string_view(payload_.data(), payload_.size())
+            .substr(headers_.topiclen, headers_.bodylen);
+    }
 
-//char* hubmessage::payload() const
-//{
-//	return data_.payload;
-//}
-
-size_t hubmessage::payload_length() const
-{
-	return data_.topiclen + data_.bodylen;
-}
-
-size_t hubmessage::topic_length() const
-{
-	return data_.topiclen;
-}
-
-char* hubmessage::body()
-{
-	return payload() + topic_length();
-}
-
-hubmessage::action hubmessage::get_action() const
-{
-	return data_.msgaction;
-}
-
-void hubmessage::set_action(action action)
-{
-	data_.msgaction = action;
-}
-
-void hubmessage::set_message(const std::string& subj)
-{
-	memcpy(payload(), subj.c_str(), subj.length());
-	data_.topiclen = subj.length();
-	data_.bodylen = 0;
-	data_.magic = cookie;
-}
-
-void hubmessage::set_message(const std::string& subj, const std::vector<char>& msg)
-{
-	set_message(subj);
-	data_.bodylen = msg.size();
-	if (header_length() + msg.size() > messagesize)
-	{
-		throw std::out_of_range("Povided message is too big");
-	}
-
-	memcpy(payload() + data_.topiclen, msg.data(), msg.size());
-}
-
-size_t hubmessage::body_length() const
-{
-	return data_.bodylen;
-}
-
-bool hubmessage::verify() const
-{
-	if (data_.magic != cookie)
-		return false;
-
-	return true;
-}
+}  // namespace msghublib

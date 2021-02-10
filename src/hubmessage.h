@@ -1,72 +1,66 @@
-#ifndef _MSGHUB_HUBMESSAGE_H_
-#define _MSGHUB_HUBMESSAGE_H_
+#pragma once
 
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <boost/asio/buffer.hpp>
+#include <functional>
+#include <string_view>
+
+#include "span.h"
+#include <boost/container/small_vector.hpp>
 #include <deque>
-#include <iterator>
-#include <memory>
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/vector.hpp>
+namespace msghublib {
 
 class hubmessage
 {
-public:
+  public:
+    // the following affect on-the-wire compatiblity
 	enum action : char { subscribe, unsubscribe, publish };
 	enum { version = 0x1 };
-	enum { cookie = 0xF00D | (version << 8) };
+	enum { cookie = 0xF00D ^ (version << 8) };
 	enum { messagesize = 0x2000 };
+    // the following does NOT affect on-the-wire compatiblity
+    enum { preallocated = 196 };
 
-private:
+    hubmessage(action a={}, std::string_view topic={}, span<char const> msg = {});
+
+	[[nodiscard]] bool             verify()     const;
+	[[nodiscard]] action           get_action() const;
+	[[nodiscard]] std::string_view topic()      const;
+	[[nodiscard]] span<char const> body()       const;
+
+  private:
 	#pragma pack(push, 1)
-	union packet
-	{
-		struct
-		{
-			uint16_t	topiclen;
-			uint16_t	bodylen;
-			action		msgaction;
-			uint16_t	magic;
-			char		payload[1];
-		};
-		char data[messagesize];
-	};
+    struct headers_t {
+        uint16_t	topiclen;
+        uint16_t	bodylen;
+        action		msgaction;
+        uint16_t	magic;
+    };
 	#pragma pack(pop)
-	packet data_;
 
-public:
-	const char* data() const;
-	char* data();
+    headers_t headers_;
+    boost::container::small_vector<char, preallocated> payload_;
 
-	hubmessage();
-	
-	bool verify() const;
+  public:
+    // input buffer views
+    auto header_buf() {
+        return boost::asio::buffer(&headers_, sizeof(headers_));
+    }
 
-	size_t header_length() const;
-	size_t length() const;
-	//const char* payload() const;
-	
-	char* payload();
-	size_t payload_length() const;
-	
-	size_t topic_length() const;
-	char* topic();
-	
-	action get_action() const;
-	void set_action(action action);
+    auto payload_area() {
+        payload_.resize(headers_.topiclen + headers_.bodylen);
+        return boost::asio::buffer(payload_.data(), payload_.size());
+    }
 
-	char* body();
-	size_t body_length() const;
-	void set_message(const std::string& subj);
-	void set_message(const std::string& subj, const std::vector<char>& msg);
+    // output buffer views
+    [[nodiscard]] auto on_the_wire() const {
+        return std::array<boost::asio::const_buffer, 2> { 
+            boost::asio::buffer(&headers_, sizeof(headers_)),
+            boost::asio::buffer(payload_.data(), payload_.size())
+        };
+    }
 };
 
-typedef std::deque<hubmessage> hubmessage_queue;
+using hubmessage_queue = std::deque<hubmessage>;
 
-#endif
+}  // namespace msghublib

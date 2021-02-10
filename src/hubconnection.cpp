@@ -1,153 +1,115 @@
 #include "hubconnection.h"
+#include <boost/system/error_code.hpp>
+#include <hub_error.h>
 
+namespace msghublib::detail {
 
-//#include "msgproc.h"
-//
-//#include <memory>
-//#include <cstdlib>
-//#include <functional>
-//#include <algorithm>
-//#include <vector>
-//#include <deque>
-//
-//#include <boost/bind.hpp>
-//#include <boost/shared_ptr.hpp>
-//#include <boost/enable_shared_from_this.hpp>
-//#include <boost/asio.hpp>
-//
-//#include <boost/thread/thread.hpp>
-//#include <boost/lexical_cast.hpp>
-//#include <boost/thread/mutex.hpp>
+    auto hubconnection::bind(void (hubconnection::*handler)(error_code)) {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
+        return [=, self=shared_from_this()](error_code ec, size_t /*transferred*/) {
+            (this->*handler)(ec);
+        };
+    }
 
-using boost::asio::ip::tcp;
+    void hubconnection::init(const std::string& host, uint16_t port, error_code& ec) {
+        try {
+            error_code ec;
+            tcp::resolver resolver(socket_.get_executor());
+            tcp::resolver::results_type results =
+                resolver.resolve(host, std::to_string(port), ec);
 
-hubconnection::hubconnection(boost::asio::io_service& io_service, hub& courier)
-	: io_service_(io_service)
-	, socket_(io_service)
-	, courier_(courier)
-{}
+            // Do blocking connect (connection is more important than
+            // subscription here)
+            if (!ec)
+                connect(socket_, results, ec);
 
-bool hubconnection::init(const std::string& host, uint16_t port)
-{
-	try
-	{
-		tcp::resolver resolver(io_service_);
-		tcp::resolver::query query(host, boost::lexical_cast<std::string>(port));
-		tcp::resolver::iterator iterator = resolver.resolve(query);
+            // Schedule packet read
+            if (!ec)
+                async_read(socket_, inmsg_.header_buf(),
+                           bind(&hubconnection::handle_read_header));
+        } catch (system_error const& se) {
+            ec = se.code();
+        } catch (...) {
+            ec = hub_errc::hub_connection_failed;
+        }
+    }
 
-		// Do blocking connect (connection is more important than subscription here)
-		boost::asio::connect(socket_, iterator);
+    void hubconnection::async_send(const hubmessage& msg) {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
+        post(socket_.get_executor(), [=, self = shared_from_this()]() mutable {
+            do_send(std::move(msg));
+        });
+    }
 
-		// Schedule packet read
-		boost::asio::async_read(socket_,
-			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
-			boost::bind(&hubconnection::handle_read_header, shared_from_this(),
-			boost::asio::placeholders::error));
-	}
-	catch (std::exception&)
-	{
-		return false;
-	}
+    void hubconnection::send(const hubmessage& msg, error_code& ec) {
+        write(socket_, msg.on_the_wire(), ec);
+    }
 
-	return true;
-}
+    void hubconnection::close(bool forced) {
+#pragma GCC diagnostic ignored "-Wdeprecated" // implicit this-capture
+        post(socket_.get_executor(),
+             [=, self = shared_from_this()] { do_close(forced); });
+    }
 
-bool hubconnection::write(const hubmessage& msg, bool wait)
-{
-	try
-	{
-		if (wait)
-		{
-			boost::asio::write(socket_, boost::asio::buffer(msg.data(), msg.length()));
-		}
-		else
-		{
-			io_service_.post(boost::bind(&hubconnection::do_write, shared_from_this(), msg));
-		}
-	}
-	catch (std::exception&)
-	{
-		return false;
-	}
+    void hubconnection::handle_read_header(error_code error) {
+        if (!error && inmsg_.verify()) {
+            async_read(socket_, inmsg_.payload_area(),
+                       bind(&hubconnection::handle_read_body));
+        } else {
+            do_close(true);
+        }
+    }
 
-}
+    void hubconnection::handle_read_body(error_code error) {
+        if (!error) {
+            courier_.deliver(inmsg_);
+            async_read(socket_, inmsg_.header_buf(),
+                       bind(&hubconnection::handle_read_header));
+        } else {
+            do_close(true);
+        }
+    }
 
-void hubconnection::close()
-{
-	io_service_.post(boost::bind(&hubconnection::do_close, shared_from_this()));
-}
+    void hubconnection::do_send(hubmessage msg) {
+        if (outmsg_queue_.push_back(std::move(msg));
+            1 == outmsg_queue_.size())
+        {
+            async_write(socket_, outmsg_queue_.front().on_the_wire(),
+                        bind(&hubconnection::handle_write));
+        }
+    }
 
-void hubconnection::handle_read_header(const boost::system::error_code& error)
-{
-	if (!error && inmsg_.verify())
-	{
-		boost::asio::async_read(
-			socket_,
-			boost::asio::buffer(inmsg_.payload(), inmsg_.payload_length()),
-			boost::bind(&hubconnection::handle_read_body, shared_from_this(),
-			boost::asio::placeholders::error));
-	}
-	else
-	{
-		do_close();
-	}
-}
+    void hubconnection::handle_write(error_code error)
+    {
+        if (!error)
+        {
+            if (outmsg_queue_.pop_front(); !outmsg_queue_.empty())
+            {
+                async_write(socket_,
+                    outmsg_queue_.front().on_the_wire(),
+                    bind(&hubconnection::handle_write));
+            } else if (is_closing) {
+                do_close(false);
+            }
+        }
+        else
+        {
+            do_close(true);
+        }
+    }
 
-void hubconnection::handle_read_body(const boost::system::error_code& error)
-{
-	if (!error)
-	{
-		courier_.deliver(shared_from_this(), inmsg_);
+    void hubconnection::do_close(bool forced)
+    {
+        is_closing = true; // atomic
 
-		boost::asio::async_read(socket_,
-			boost::asio::buffer(inmsg_.data(), inmsg_.header_length()),
-			boost::bind(&hubconnection::handle_read_header, shared_from_this(),
-			boost::asio::placeholders::error));
-	}
-	else
-	{
-		do_close();
-	}
-}
+        // TODO(sehe): Unsubscribe?
 
-void hubconnection::do_write(hubmessage msg)
-{
-	boost::mutex::scoped_lock lock(write_msgs_lock_);
-	bool iswriting = !outmsg_queue_.empty();
-	outmsg_queue_.push_back(msg);
-	if (!iswriting)
-	{
-		boost::asio::async_write(socket_,
-			boost::asio::buffer(outmsg_queue_.front().data(),
-			outmsg_queue_.front().length()),
-			boost::bind(&hubconnection::handle_write, shared_from_this(),
-			boost::asio::placeholders::error));
-	}
-}
+        if (forced || outmsg_queue_.empty()) {
+            if (socket_.is_open()) {
+                error_code ec;
+                socket_.close(ec);
+            }
+        }
+    }
 
-void hubconnection::handle_write(const boost::system::error_code& error)
-{
-	if (!error)
-	{
-		boost::mutex::scoped_lock lock(write_msgs_lock_);
-		outmsg_queue_.pop_front();
-		if (!outmsg_queue_.empty())
-		{
-			boost::asio::async_write(socket_,
-				boost::asio::buffer(outmsg_queue_.front().data(),
-				outmsg_queue_.front().length()),
-				boost::bind(&hubconnection::handle_write, shared_from_this(),
-				boost::asio::placeholders::error));
-		}
-	}
-	else
-	{
-		do_close();
-	}
-}
-
-void hubconnection::do_close()
-{
-	// TODO: Unsubscribe?
-	socket_.close();
-}
+} // namespace msghublib::detail

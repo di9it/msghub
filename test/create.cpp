@@ -1,31 +1,39 @@
 #include "msghub.h"
 
-#include <algorithm>
-#include <string>
-
 #include <boost/asio.hpp>
-#include <boost/test/test_tools.hpp>
+#include <boost/test/unit_test.hpp>
 
-void test_create()
+BOOST_AUTO_TEST_SUITE(message_hub)
+
+BOOST_AUTO_TEST_CASE(test_create)
 {
-	// Create 2 instances with same address and port, second shoul fail
-	{
-		boost::asio::io_service io_service;
-		//boost::asio::io_service io_service2;
-		
-		msghub msghub1(io_service);
-		BOOST_CHECK(msghub1.create(0xBEE));
-		
-		msghub msghub2(io_service);
-		
-		// Fail as port is in use by previous instance (-SO_REUSEPORT, issue on Windows)
-		//BOOST_CHECK(!msghub2.create(0xBEE));
+    boost::asio::io_context io;
 
-		BOOST_CHECK(msghub2.create(0xB0B));
-		//io_service.run();
-		//io_service2.run();
-		io_service.stop();
-		//io_service2.stop();
-	}
+    msghublib::msghub msghub1(io.get_executor());
+    BOOST_CHECK_NO_THROW(msghub1.create(0xBEE));
 
+    // Fail as port is in use by previous instance (-SO_REUSEPORT, issue on Windows)
+    using SE = msghublib::system_error;
+    auto holds = [](auto code) {
+        return [=](SE const& se) {
+            return se.code() == code;
+        };
+    };
+
+    {
+        msghublib::msghub msghub2(io.get_executor());
+        BOOST_CHECK_EXCEPTION(msghub2.create(0xBEE), SE, holds(boost::asio::error::address_in_use));
+        BOOST_CHECK_EXCEPTION(msghub2.create(0xB0B), SE, holds(boost::asio::error::already_open));
+    }
+
+    {
+        msghublib::msghub msghub3(io.get_executor());
+        BOOST_CHECK_NO_THROW(msghub3.create(0xB0B));
+    }
+    //io.run();
+    //io_service2.run();
+    io.stop();
+    //io_service2.stop();
 }
+
+BOOST_AUTO_TEST_SUITE_END()

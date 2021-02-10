@@ -1,0 +1,11 @@
+FROM ubuntu:18.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN \
+        apt update; \
+        apt -qqyy install build-essential git cmake libboost-all-dev
+
+RUN git clone https://github.com/sehe/msghub --depth 1 -b cmake
+WORKDIR /msghub
+RUN cmake . && make
+
+CMD ["/bin/bash", "-c", "(./examples/server & ./examples/client ; kill %1; wait)"]

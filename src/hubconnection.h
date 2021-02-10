@@ -1,51 +1,50 @@
-#ifndef _MSGHUB_HUBCONNECTION_H_
-#define _MSGHUB_HUBCONNECTION_H_
+#pragma once
 
-#include "hub.h"
+#include "ihub.h"
 #include "hubmessage.h"
+#include "hub_error.h"
 
+#include <boost/system/error_code.hpp>
 #include <string>
 #include <memory>
-#include <cstdlib>
 #include <functional>
-#include <algorithm>
-#include <vector>
-#include <deque>
 
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <boost/atomic.hpp>
 #include <boost/asio.hpp>
 
-#include <boost/thread/thread.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/thread/mutex.hpp>
-
+namespace msghublib { namespace detail {
 using boost::asio::ip::tcp;
 
-class hubconnection : public boost::enable_shared_from_this<hubconnection>
+class hubconnection : public std::enable_shared_from_this<hubconnection>
 {
 public:
-	hubconnection(boost::asio::io_service& io_service, hub& courier);
-	bool init(const std::string& host, uint16_t port);
-	bool write(const hubmessage& msg, bool wait = false);
-	void close();
+    template <typename Executor>
+	hubconnection(Executor executor, ihub& courier)
+        : socket_(make_strand(executor))
+        , courier_(courier)
+        , is_closing(false)
+    {}
+
+	void init(const std::string& host, uint16_t port, error_code& ec);
+	void async_send(const hubmessage& msg);
+	void send(const hubmessage& msg, error_code& ec);
+	void close(bool forced);
 
 private:
+    auto bind(void (hubconnection::* /*handler*/)(error_code));
 
-	void handle_read_header(const boost::system::error_code& error);
-	void handle_read_body(const boost::system::error_code& error);
-	void do_write(hubmessage msg);
-	void handle_write(const boost::system::error_code& error);
-	void do_close();
+	void handle_read_header(error_code error);
+	void handle_read_body(error_code error);
+	void do_send(hubmessage msg);
+	void handle_write(error_code error);
+	void do_close(bool forced);
 
-private:
-	hub&						courier_;
-	boost::asio::io_service&	io_service_;
-	tcp::socket					socket_;
-	hubmessage					inmsg_;
-	hubmessage_queue			outmsg_queue_;
-	boost::mutex				write_msgs_lock_;
+	tcp::socket        socket_;
+	ihub&              courier_;
+	hubmessage         inmsg_;
+	hubmessage_queue   outmsg_queue_;
+	std::atomic_bool   is_closing;
 };
 
-#endif
+}  // namespace detail
+}  // namespace msghublib
